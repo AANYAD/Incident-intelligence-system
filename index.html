@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UrbanPulse Lite | Incident Intelligence</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --accent-color: #ff4d00; /* International Orange */
+            --secondary-accent: #00ff9d; /* Data Green */
+            --surface-color: #1e1e1e;
+            --border-color: #333;
+            
+            --font-display: 'Archivo Black', sans-serif;
+            --font-mono: 'Space Mono', monospace;
+            --font-body: 'Inter', sans-serif;
+
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* UTILITIES */
+        .mono { font-family: var(--font-mono); }
+        .display { font-family: var(--font-display); }
+        .hidden { display: none !important; }
+
+        /* FILM GRAIN */
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 999; opacity: 0.05;
+            background: url('https://grainy-gradients.vercel.app/noise.svg');
+        }
+
+        /* NAVIGATION */
+        nav {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1.5rem 2rem; position: fixed; width: 100%; top: 0; z-index: 100;
+            background: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s var(--ease-out);
+        }
+
+        .logo-text {
+            font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem;
+            letter-spacing: -1px; text-transform: uppercase;
+        }
+
+        .nav-status {
+            font-family: var(--font-mono); font-size: 0.8rem; display: flex;
+            align-items: center; gap: 10px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px; background-color: var(--secondary-accent);
+            border-radius: 50%; box-shadow: 0 0 10px var(--secondary-accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; box-shadow: 0 0 5px var(--secondary-accent); }
+            50% { opacity: 0.5; box-shadow: 0 0 2px var(--secondary-accent); }
+            100% { opacity: 1; box-shadow: 0 0 5px var(--secondary-accent); }
+        }
+
+        /* HERO SECTION */
+        .hero {
+            min-height: 80vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 6rem 1rem; position: relative;
+        }
+
+        .hero-title {
+            font-family: var(--font-display); font-size: 12vw; line-height: 0.85;
+            text-transform: uppercase; text-align: center; letter-spacing: -0.05em;
+            color: #fff; mix-blend-mode: exclusion; opacity: 0;
+            animation: textReveal 1s var(--ease-out) forwards;
+        }
+
+        .hero-title:nth-child(2) { animation-delay: 0.1s; }
+
+        @keyframes textReveal {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .hero-tagline {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-5deg);
+            background: var(--accent-color); color: black; padding: 0.5rem 1rem;
+            font-family: var(--font-mono); font-size: clamp(1rem, 2vw, 1.5rem);
+            font-weight: 700; white-space: nowrap; z-index: 2; opacity: 0;
+            animation: scaleIn 0.5s var(--ease-out) 0.5s forwards;
+        }
+
+        @keyframes scaleIn {
+            from { transform: translate(-50%, -50%) rotate(-5deg) scale(0.8); opacity: 0; }
+            to { transform: translate(-50%, -50%) rotate(-5deg) scale(1); opacity: 1; }
+        }
+
+        /* INTERFACE SECTION */
+        .interface-wrapper {
+            max-width: 1400px; margin: 0 auto; padding: 2rem; min-height: 100vh;
+        }
+
+        .tab-nav {
+            display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem; overflow-x: auto;
+        }
+
+        .tab-btn {
+            background: none; border: 1px solid transparent; color: #666;
+            font-family: var(--font-mono); font-size: 1rem; text-transform: uppercase;
+            padding: 0.5rem 1.5rem; cursor: pointer; transition: all 0.3s; white-space: nowrap;
+        }
+
+        .tab-btn.active { color: black; background: var(--text-color); font-weight: 700; }
+        .tab-btn:hover { color: var(--text-color); border-color: #333; }
+
+        .view-section { display: none; opacity: 0; transform: translateY(20px); transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
+        .view-section.active { display: grid; opacity: 1; transform: translateY(0); }
+
+        .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; }
+
+        .brutal-form {
+            background: var(--surface-color); padding: 2rem; border: 1px solid var(--border-color); position: relative;
+        }
+
+        .input-group { margin-bottom: 2rem; position: relative; }
+        .input-group label {
+            display: block; font-family: var(--font-mono); font-size: 0.8rem;
+            color: #888; margin-bottom: 0.5rem; text-transform: uppercase;
+        }
+
+        .brutal-input {
+            width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--border-color);
+            color: white; font-family: var(--font-body); font-size: 1.2rem; padding: 0.8rem 0;
+            border-radius: 0; outline: none; transition: border-color 0.3s;
+        }
+        .brutal-input:focus { border-bottom-color: var(--accent-color); }
+
+        .file-drop-zone {
+            border: 1px dashed var(--border-color); padding: 2rem; text-align: center;
+            cursor: pointer; transition: all 0.3s; background: rgba(255,255,255,0.02);
+            position: relative; overflow: hidden;
+        }
+        .file-drop-zone:hover { border-color: var(--text-color); background: rgba(255,255,255,0.05); }
+        .file-drop-zone.has-image { border-style: solid; border-color: var(--secondary-accent); padding: 0; height: 200px; }
+        .image-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .file-label-text { pointer-events: none; }
+
+        .location-wrapper { display: flex; align-items: center; gap: 1rem; }
+        .btn-locate {
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-color);
+            padding: 0.8rem 1.2rem; font-family: var(--font-mono); font-size: 0.8rem;
+            cursor: pointer; text-transform: uppercase; transition: all 0.3s; white-space: nowrap;
+        }
+        .btn-locate:hover { border-color: var(--secondary-accent); color: var(--secondary-accent); }
+
+        .location-status {
+            font-family: var(--font-mono); font-size: 0.8rem; color: #666; animation: blink 1s infinite paused;
+        }
+        .location-status.scanning { color: var(--secondary-accent); animation-play-state: running; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .action-btn {
+            width: 100%; background: white; color: black; border: none; padding: 1.5rem;
+            font-family: var(--font-display); font-size: 1.2rem; text-transform: uppercase;
+            cursor: pointer; transition: transform 0.2s, background-color 0.2s;
+            display: flex; justify-content: space-between; align-items: center; margin-top: 2rem;
+        }
+        .action-btn:active { transform: scale(0.98); }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease-out);
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            background: var(--bg-color); border: 1px solid var(--text-color); padding: 2rem;
+            width: 90%; max-width: 400px; transform: translateY(20px);
+            transition: transform 0.3s var(--ease-out); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .modal-overlay.open .modal-box { transform: translateY(0); }
+        .modal-title { font-family: var(--font-display); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 1rem; color: var(--text-color); }
+        .modal-message { font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.5; color: #aaa; margin-bottom: 2rem; }
+        .modal-btn { background: var(--text-color); color: var(--bg-color); border: none; padding: 1rem 2rem; font-family: var(--font-mono); font-weight: 700; cursor: pointer; text-transform: uppercase; width: 100%; }
+        .modal-box.success { border-color: var(--secondary-accent); }
+        .modal-box.success .modal-title { color: var(--secondary-accent); }
+        .modal-box.error { border-color: var(--accent-color); }
+        .modal-box.error .modal-title { color: var(--accent-color); }
+
+        @media (max-width: 768px) {
+            .hero-title { font-size: 16vw; }
+            .report-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .hero-tagline { font-size: 1.2rem; transform: translate(-50%, -50%) rotate(-3deg); }
+            .tab-nav { justify-content: flex-start; padding-bottom: 0.5rem; }
+            nav { padding: 1rem; }
+            .file-drop-zone { padding: 3rem 1rem; }
+        }
+        /* MAP */
+        .map-container { margin-top: 1rem; }
+        #map { width: 100%; height: 300px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .type-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.9rem; }
+        .type-badge .material-icons { font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+
+    <nav>
+        <div class="logo-text">UrbanPulse_Lite</div>
+        <div class="nav-status">
+            <div class="status-dot"></div>
+            <span class="mono">SYSTEM ONLINE</span>
+        </div>
+    </nav>
+
+    <div class="modal-overlay" id="customModal">
+        <div class="modal-box" id="modalBox">
+            <div class="modal-title" id="modalTitle">System Message</div>
+            <div class="modal-message" id="modalMessage">Operation completed successfully.</div>
+            <button class="modal-btn" onclick="closeModal()">Acknowledge</button>
+        </div>
+    </div>
+
+    <section class="hero">
+        <div style="position: relative; width: 100%;">
+            <h1 class="hero-title">Report</h1>
+            <h1 class="hero-title">The Chaos</h1>
+            <div class="hero-tagline">AI-DRIVEN INCIDENT RESPONSE</div>
+        </div>
+    </section>
+
+    <div class="interface-wrapper">
+        
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="setTab('citizen')">Report Incident</button>
+            <button class="tab-btn" onclick="window.location.href='admin.html'">Admin Dashboard</button>
+        </div>
+
+        <div id="citizen-view" class="view-section active">
+            <div class="report-grid">
+                
+                <div style="display: flex; flex-direction: column;">
+                    <h2 class="display" style="font-size: 2.5rem; margin-bottom: 1rem; color: #fff;">Spot it.<br>Report it.</h2>
+                    <p class="mono" style="color: #888; font-size: 0.9rem; line-height: 1.6;">
+                        Securely upload evidence and geo-tag infrastructure failures.
+                        <br><br>
+                        > Encrypted submission.<br>
+                        > Direct routing to municipal grid.
+                    </p>
+                    
+                    <div style="margin-top: auto; padding-top: 2rem;">
+                        <div class="mono" style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">RECENT ACTIVITY</div>
+                        <div style="border-left: 2px solid var(--secondary-accent); padding-left: 1rem;">
+                            <div class="mono" style="color: var(--secondary-accent);">#9920 Resolved</div>
+                            <div class="mono" style="font-size: 0.8rem;">Water Leak @ Sector 7</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form class="brutal-form" onsubmit="handleReport(event)">
+                    
+                    <div class="input-group">
+                        <label>Evidence Capture</label>
+                        <label class="file-drop-zone" id="dropZone">
+                            <input type="file" id="evidenceFile" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
+                            <div class="file-label-text">
+                                <span class="display" style="font-size: 1.5rem;">+ TAP TO CAPTURE</span><br>
+                                <span class="mono" style="font-size: 0.8rem; color: #666;">or drop file here</span>
+                            </div>
+                            <img id="previewImg" class="image-preview" alt="Evidence Preview">
+                        </label>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Incident Type</label>
+                        <div style="display:flex;gap:1rem;align-items:center;">
+                            <select class="brutal-input" id="incidentType" style="background:#1e1e1e;">
+                                <option>Infrastructure Damage</option>
+                                <option>Water / Sanitation</option>
+                                <option>Power Outage</option>
+                                <option>Traffic Obstruction</option>
+                            </select>
+                            <div id="typePreview" class="type-badge" aria-hidden="true"></div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Geolocation Data</label>
+                        <div class="location-wrapper">
+                            <input type="text" class="brutal-input" id="locationInput" placeholder="--.--, --.--" readonly>
+                            <button type="button" class="btn-locate" onclick="getLocation()">
+                                [ O ] ACQUIRE
+                            </button>
+                        </div>
+                        <div class="location-status" id="locStatus">WAITING FOR SATELLITE...</div>
+                        <div id="mapContainer" class="map-container hidden">
+                            <div id="map"></div>
+                            <div class="mono" style="font-size:0.8rem;color:#888;margin-top:0.5rem;">Drag marker or click map to fine-tune location</div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Description</label>
+                        <textarea class="brutal-input" id="desc" rows="1" placeholder="Brief details..." style="resize: none;"></textarea>
+                    </div>
+
+                    <button type="submit" class="action-btn" id="submitBtn">
+                        <span id="btnText">Transmit Data</span>
+                        <span>&rarr;</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <footer style="margin-top: 4rem; padding: 4rem 2rem; border-top: 1px solid #333;">
+        <div class="mono" style="font-size: 0.8rem; color: #555;">
+            URBANPULSE LITE // V2.0<br>
+            SECURE CONNECTION
+        </div>
+    </footer>
+
+    <script>
+        // --- 1. Custom Dialog Logic ---
+        const modal = document.getElementById('customModal');
+        const modalBox = document.getElementById('modalBox');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMsg = document.getElementById('modalMessage');
+
+        function showDialog(title, message, type = 'normal') {
+            modalTitle.innerText = title;
+            modalMsg.innerText = message;
+            
+            modalBox.className = 'modal-box';
+            
+            if (type === 'success') modalBox.classList.add('success');
+            if (type === 'error') modalBox.classList.add('error');
+
+            modal.classList.add('open');
+        }
+
+        function closeModal() {
+            modal.classList.remove('open');
+        }
+
+        // --- 2. Tab Navigation ---
+        function setTab(tabName) {
+            // Keep existing UI logic, though Admin now redirects
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(section => {
+                section.classList.remove('active');
+                setTimeout(() => section.style.opacity = '0', 0);
+            });
+            event.target.classList.add('active');
+            const targetSection = document.getElementById(tabName + '-view');
+            setTimeout(() => {
+                if(targetSection) targetSection.classList.add('active');
+            }, 100);
+        }
+
+        // --- 3. Image Handling ---
+        function handleImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                const dropZone = document.getElementById('dropZone');
+                const preview = document.getElementById('previewImg');
+                const labelText = document.querySelector('.file-label-text');
+
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    dropZone.classList.add('has-image');
+                    labelText.style.display = 'none';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // --- 4. Geolocation Logic ---
+        function getLocation() {
+            const status = document.getElementById('locStatus');
+            const input = document.getElementById('locationInput');
+            
+            status.innerText = "TRIANGULATING SIGNAL...";
+            status.classList.add('scanning');
+            input.placeholder = "SEARCHING...";
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                status.classList.remove('scanning');
+                showDialog("SYSTEM ERROR", "Geolocation is not supported by this browser.", "error");
+            }
+        }
+
+        function showPosition(position) {
+            const status = document.getElementById('locStatus');
+            const input = document.getElementById('locationInput');
+            
+            setTimeout(() => {
+                const lat = position.coords.latitude.toFixed(6);
+                const long = position.coords.longitude.toFixed(6);
+                input.value = `${lat}, ${long}`;
+                status.innerText = "SIGNAL LOCKED";
+                status.classList.remove('scanning');
+                status.style.color = "var(--secondary-accent)";
+                showDialog("TARGET ACQUIRED", `Coordinates locked: ${lat}, ${long}`, "success");
+                // Attempt to load and display Google Map under the location input
+                ensureGoogleMaps().then(() => {
+                    initMapAt(parseFloat(lat), parseFloat(long));
+                }).catch(() => {
+                    // If maps cannot load, inform user but keep existing functionality unchanged
+                    console.warn('Google Maps failed to load. Set your API key in the script loader.');
+                });
+            }, 1500);
+        }
+
+        // --- Google Maps helper (loads API then initializes a draggable marker) ---
+        let _gmapsLoading = null;
+        let map = null;
+        let marker = null;
+
+        function ensureGoogleMaps() {
+            // Replace YOUR_API_KEY with a valid Google Maps JavaScript API key.
+            if (window.google && window.google.maps) return Promise.resolve();
+            if (_gmapsLoading) return _gmapsLoading;
+
+            _gmapsLoading = new Promise((resolve, reject) => {
+                window.onGoogleMapsLoaded = function() { resolve(); };
+                const script = document.createElement('script');
+                script.async = true;
+                script.defer = true;
+                script.src = 'https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=onGoogleMapsLoaded';
+                script.onerror = function() { reject(new Error('Google Maps script failed to load')); };
+                document.head.appendChild(script);
+            });
+            return _gmapsLoading;
+        }
+
+        function initMapAt(lat, lng) {
+            const mapContainer = document.getElementById('mapContainer');
+            mapContainer.classList.remove('hidden');
+
+            const mapEl = document.getElementById('map');
+            if (!map) {
+                map = new google.maps.Map(mapEl, {
+                    center: { lat: lat, lng: lng },
+                    zoom: 16,
+                    streetViewControl: false,
+                });
+
+                marker = new google.maps.Marker({
+                    position: { lat: lat, lng: lng },
+                    map: map,
+                    draggable: true,
+                    title: 'Drag to adjust location'
+                });
+
+                // When marker dragged, update the input
+                marker.addListener('dragend', function() {
+                    const p = marker.getPosition();
+                    updateLocationInput(p.lat(), p.lng());
+                });
+
+                // Click on map to move marker
+                map.addListener('click', function(e) {
+                    const p = e.latLng;
+                    marker.setPosition(p);
+                    map.panTo(p);
+                    updateLocationInput(p.lat(), p.lng());
+                });
+            } else {
+                const pos = { lat: lat, lng: lng };
+                map.setCenter(pos);
+                marker.setPosition(pos);
+            }
+        }
+
+        function updateLocationInput(lat, lng) {
+            const input = document.getElementById('locationInput');
+            input.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        }
+
+        // --- Simple rule-based classifier & router ---
+        function classifyIncident(description, incidentType) {
+            const text = (description || '').toLowerCase() + ' ' + (incidentType || '').toLowerCase();
+            const mapping = [
+                { keywords: ['water', 'sewer', 'sanitation', 'leak'], dept: 'Water Dept' },
+                { keywords: ['power', 'electric', 'outage', 'transformer'], dept: 'Power & Energy' },
+                { keywords: ['road', 'pothole', 'traffic', 'bridge'], dept: 'Public Works' },
+                { keywords: ['fire', 'smoke'], dept: 'Fire & Rescue' },
+            ];
+
+            for (const m of mapping) {
+                if (m.keywords.some(k => text.indexOf(k) !== -1)) {
+                    return { department: m.dept, confidence: 0.9 };
+                }
+            }
+
+            return { department: 'General Services', confidence: 0.6 };
+        }
+
+        function slaForType(type) {
+            const t = (type || '').toLowerCase();
+            if (t.indexOf('water') !== -1 || t.indexOf('sanitation') !== -1) return 24; // 24 hours
+            if (t.indexOf('power') !== -1 || t.indexOf('outage') !== -1) return 12; // 12 hours
+            if (t.indexOf('traffic') !== -1 || t.indexOf('road') !== -1) return 48; // 48 hours
+            if (t.indexOf('infrastructure') !== -1) return 72; // 72 hours
+            return 48; // default
+        }
+
+        // --- Incident type metadata (icon & color) ---
+        function getTypeMeta(type) {
+            const t = (type || '').toLowerCase();
+            const meta = {
+                'water': { icon: 'water_drop', color: '#00aaff', label: 'Water / Sanitation' },
+                'power': { icon: 'bolt', color: '#ffd100', label: 'Power Outage' },
+                'traffic': { icon: 'traffic', color: '#ff4d00', label: 'Traffic Obstruction' },
+                'road': { icon: 'construction', color: '#ff6b00', label: 'Public Works' },
+                'infrastructure': { icon: 'business', color: '#9b59b6', label: 'Infrastructure' },
+                'sanitation': { icon: 'water_drop', color: '#00aaff', label: 'Water / Sanitation' },
+            };
+
+            for (const k in meta) {
+                if (t.indexOf(k) !== -1) return meta[k];
+            }
+            return { icon: 'report_problem', color: '#888', label: type };
+        }
+
+        function updateTypePreview() {
+            const sel = document.getElementById('incidentType');
+            const preview = document.getElementById('typePreview');
+            if (!sel || !preview) return;
+            const meta = getTypeMeta(sel.value);
+            preview.innerHTML = `<span class="material-icons" style="color:${meta.color}">${meta.icon}</span><span style="color:${meta.color};font-weight:700">${meta.label}</span>`;
+        }
+
+        // attach change handler to update preview
+        document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.getElementById('incidentType');
+            if (sel) {
+                sel.addEventListener('change', updateTypePreview);
+                updateTypePreview();
+            }
+        });
+
+        function showError(error) {
+            const status = document.getElementById('locStatus');
+            status.innerText = "SIGNAL LOST";
+            status.classList.remove('scanning');
+            showDialog("CONNECTION FAILED", "Unable to retrieve location.", "error");
+        }
+
+        // --- 5. Form Submission & Storage ---
+        function handleReport(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const originalText = "Transmit Data";
+
+            // 1. Gather Data
+            const type = document.getElementById('incidentType').value;
+            const location = document.getElementById('locationInput').value || "Unknown Coordinates";
+            const desc = document.getElementById('desc').value || "No details provided";
+            const hasImage = document.getElementById('evidenceFile').files.length > 0;
+            const id = 'INC-' + Math.floor(Math.random() * 9000 + 1000);
+
+            // 2. Visual Processing State
+            btnText.innerText = "UPLOADING...";
+            btn.style.backgroundColor = "var(--accent-color)";
+            btn.style.color = "white";
+
+            setTimeout(() => {
+                // 3. Save to Local Storage
+                // auto-classify and route
+                const classification = classifyIncident(desc, type);
+                const slaHours = slaForType(type); // SLA window per incident type (hours)
+                const createdAt = new Date();
+                const slaDue = new Date(createdAt.getTime() + slaHours * 60 * 60 * 1000).toISOString();
+
+                const newIncident = {
+                    id: id,
+                    type: type,
+                    location: location,
+                    description: desc,
+                    status: 'OPEN',
+                    timestamp: createdAt.toLocaleString(),
+                    hasImage: hasImage,
+                    department: classification.department,
+                    classificationConfidence: classification.confidence,
+                    slaDue: slaDue
+                };
+                // add icon/color metadata for consistent rendering in admin
+                try {
+                    const meta = getTypeMeta(type);
+                    newIncident.typeIcon = meta.icon;
+                    newIncident.typeColor = meta.color;
+                } catch(e) {}
+
+                const existingData = JSON.parse(localStorage.getItem('urbanPulseData')) || [];
+                existingData.unshift(newIncident);
+                localStorage.setItem('urbanPulseData', JSON.stringify(existingData));
+
+                // 4. Success State
+                btnText.innerText = "SENT";
+                btn.style.backgroundColor = "var(--secondary-accent)";
+                btn.style.color = "black";
+                
+                setTimeout(() => {
+                    showDialog("TRANSMISSION COMPLETE", `Incident Report #${id} has been routed to dispatch.`, "success");
+                    e.target.reset();
+                    
+                    // Reset visual elements
+                    document.getElementById('dropZone').classList.remove('has-image');
+                    document.getElementById('previewImg').style.display = 'none';
+                    document.querySelector('.file-label-text').style.display = 'block';
+                    document.getElementById('locStatus').innerText = "WAITING FOR SATELLITE...";
+                    document.getElementById('locStatus').style.color = "#666";
+                    
+                    btnText.innerText = originalText;
+                    btn.style.backgroundColor = "white";
+                    btn.style.color = "black";
+                }, 1000);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

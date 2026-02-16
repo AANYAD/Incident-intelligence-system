@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UrbanPulse | Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <style>
+        /* REUSING CORE STYLES */
+        :root {
+            --bg-color: #0a0a0a; --text-color: #e0e0e0; --accent-color: #ff4d00; 
+            --secondary-accent: #00ff9d; --surface-color: #141414; --border-color: #333;
+            --font-display: 'Archivo Black', sans-serif; --font-mono: 'Space Mono', monospace;
+        }
+        body { background: var(--bg-color); color: var(--text-color); font-family: 'Inter', sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        .mono { font-family: var(--font-mono); } .display { font-family: var(--font-display); }
+        .noise-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.05; background: url('https://grainy-gradients.vercel.app/noise.svg'); z-index: 999; }
+
+        /* AUTH SCREEN */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        .auth-box { border: 1px solid var(--border-color); padding: 3rem; background: var(--surface-color); text-align: center; }
+        .auth-input { background: transparent; border: 1px solid #444; color: white; padding: 0.8rem; margin: 1rem 0; width: 200px; text-align: center; font-family: var(--font-mono); }
+        .auth-btn { background: white; color: black; border: none; padding: 0.8rem 2rem; cursor: pointer; font-family: var(--font-display); text-transform: uppercase; }
+
+        /* DASHBOARD LAYOUT */
+        nav { padding: 1rem 2rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #000; }
+        .dashboard-container { flex: 1; display: grid; grid-template-columns: 300px 1fr; overflow: hidden; }
+        
+        /* SIDEBAR STATS */
+        .sidebar { border-right: 1px solid var(--border-color); padding: 2rem; background: var(--surface-color); }
+        .stat-card { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #222; }
+        .stat-val { font-size: 3rem; font-family: var(--font-display); line-height: 1; }
+        .stat-label { color: #666; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
+
+        /* FEED AREA */
+        .feed { padding: 2rem; overflow-y: auto; }
+        .feed-header { display: flex; justify-content: space-between; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        
+        /* INCIDENT ITEM */
+        .incident-card { background: #111; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1rem; display: grid; grid-template-columns: 50px 1fr auto; gap: 1.5rem; align-items: center; transition: 0.2s; }
+        .incident-card:hover { border-color: #555; transform: translateX(5px); }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: var(--accent-color); box-shadow: 0 0 10px var(--accent-color); }
+        .status-indicator.resolved { background: var(--secondary-accent); box-shadow: 0 0 10px var(--secondary-accent); opacity: 0.5; }
+        
+        .incident-actions button { background: transparent; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; cursor: pointer; font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; transition: 0.2s; }
+        .incident-actions button:hover { background: var(--text-color); color: black; }
+        
+        .empty-state { text-align: center; color: #444; margin-top: 4rem; font-family: var(--font-mono); }
+        .type-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.9rem; }
+        .type-badge .material-icons { font-size: 1rem; }
+        /* Responsive & sidebar behavior */
+        @media (max-width: 900px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+            .sidebar { position: fixed; left: 0; top: 56px; bottom: 0; width: 80%; max-width: 320px; transform: translateX(-110%); transition: transform 0.25s ease; z-index: 2000; }
+            .dashboard-container.showSidebar .sidebar { transform: translateX(0); }
+            #hotspotMap { height: 220px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h1 class="display" style="font-size: 1.5rem; margin-bottom: 0.5rem;">RESTRICTED ACCESS</h1>
+            <p class="mono" style="font-size: 0.8rem; color: #666;">ENTER CREDENTIALS</p>
+            <input type="password" id="adminPass" class="auth-input" placeholder="PASS: admin">
+            <br>
+            <button class="auth-btn" onclick="checkAuth()">Unlock</button>
+            <p id="authError" class="mono" style="color: var(--accent-color); font-size: 0.7rem; margin-top: 1rem; display: none;">ACCESS DENIED</p>
+        </div>
+    </div>
+
+    <nav>
+        <div class="mono" style="color: var(--secondary-accent);">● SYSTEM ONLINE</div>
+        <div class="display">ADMIN DASHBOARD</div>
+        <button onclick="logout()" class="mono" style="background: none; border: 1px solid #333; color: white; padding: 0.3rem 0.8rem; cursor: pointer;">LOGOUT</button>
+    </nav>
+
+    <div id="dashboardContainer" class="dashboard-container">
+        <aside class="sidebar">
+            <div class="stat-card">
+                <div class="stat-val" style="color: var(--accent-color);" id="totalOpen">0</div>
+                <div class="stat-label">Active Incidents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" style="color: var(--secondary-accent);" id="totalResolved">0</div>
+                <div class="stat-label">Resolved Cases</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" style="color: #ffcc00;" id="totalSLA">0</div>
+                <div class="stat-label">SLA Breaches</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val">100%</div>
+                <div class="stat-label">System Uptime</div>
+            </div>
+        </aside>
+
+        <main class="feed">
+            <div id="hotspotMap" style="height: 300px; margin-bottom: 1rem; border:1px solid #222;"></div>
+            <div class="feed-header">
+                <span class="mono">INCOMING DATA STREAM</span>
+                <span class="mono" id="lastUpdate">LAST SYNC: JUST NOW</span>
+            </div>
+            
+            <div id="incidentList">
+                </div>
+        </main>
+    </div>
+
+    <!-- Incident Details Modal -->
+    <div id="incidentModal" style="position:fixed;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;z-index:3000;background:rgba(0,0,0,0.6);">
+        <div style="background:var(--surface-color);padding:1.5rem;border:1px solid var(--border-color);width:90%;max-width:480px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                <div class="display">Incident Details</div>
+                <button onclick="closeIncidentModal()" class="mono" style="background:none;border:1px solid #333;color:#fff;padding:0.3rem 0.6rem;">CLOSE</button>
+            </div>
+            <div id="modalContent" class="mono" style="color:#ddd;font-size:0.9rem;line-height:1.4;"></div>
+            <div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button id="modalResolveBtn" onclick="modalResolve()" class="mono" style="background:#ff4d00;border:none;color:#000;padding:0.6rem 0.9rem;">MARK RESOLVED</button>
+                <button id="modalReopenBtn" onclick="modalReopen()" class="mono" style="background:transparent;border:1px solid #444;color:#fff;padding:0.6rem 0.9rem;display:none;">REOPEN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load Leaflet for admin hotspots (no API key required)
+        (function loadLeaflet(){
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(link);
+
+            // MarkerCluster CSS
+            const mcCss = document.createElement('link');
+            mcCss.rel = 'stylesheet';
+            mcCss.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+            document.head.appendChild(mcCss);
+            const mcCss2 = document.createElement('link');
+            mcCss2.rel = 'stylesheet';
+            mcCss2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+            document.head.appendChild(mcCss2);
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = function(){
+                // load markercluster after leaflet
+                const mc = document.createElement('script');
+                mc.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+                document.body.appendChild(mc);
+            };
+            document.body.appendChild(script);
+        })();
+        // 1. Authentication Logic
+        function checkAuth() {
+            const pass = document.getElementById('adminPass').value;
+            if(pass === 'admin') {
+                document.getElementById('auth-screen').style.opacity = '0';
+                setTimeout(() => document.getElementById('auth-screen').style.display = 'none', 500);
+                loadData();
+            } else {
+                document.getElementById('authError').style.display = 'block';
+            }
+        }
+
+        function logout() {
+            location.reload();
+        }
+
+        // 2. Data Fetching & Rendering
+        function loadData() {
+            const rawData = localStorage.getItem('urbanPulseData');
+            const incidents = JSON.parse(rawData) || [];
+            const listContainer = document.getElementById('incidentList');
+            
+            // Calculate Stats
+            const openCount = incidents.filter(i => i.status === 'OPEN').length;
+            const resolvedCount = incidents.filter(i => i.status === 'RESOLVED').length;
+            const slaBreaches = incidents.filter(i => i.status !== 'RESOLVED' && i.slaDue && (new Date(i.slaDue) < new Date())).length;
+            
+            document.getElementById('totalOpen').innerText = openCount.toString().padStart(2, '0');
+            document.getElementById('totalResolved').innerText = resolvedCount.toString().padStart(2, '0');
+            document.getElementById('totalSLA').innerText = slaBreaches.toString().padStart(2, '0');
+
+            // Render List
+            listContainer.innerHTML = '';
+            
+            if(incidents.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state">[ NO ACTIVE INCIDENTS DETECTED ]</div>';
+                return;
+            }
+
+            // Render hotspot map markers (if Leaflet loaded)
+            setTimeout(() => {
+                try {
+                    if (window.L) {
+                        renderHotspotMap(incidents);
+                    }
+                } catch(e) { console.warn('Map render error', e); }
+            }, 300);
+
+            incidents.forEach((incident, index) => {
+                const isResolved = incident.status === 'RESOLVED';
+                
+                const html = `
+                    <div class="incident-card" onclick="showIncidentDetails(${index})" style="${isResolved ? 'opacity: 0.5' : ''}">
+                        <div class="status-indicator ${isResolved ? 'resolved' : ''}"></div>
+                        <div>
+                                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem;">
+                                                <div class="type-badge" style="background:transparent;padding:0;">
+                                                    <span class="material-icons" style="color:${incident.typeColor || '#888'}">${incident.typeIcon || (incident.type? 'report_problem' : 'report_problem')}</span>
+                                                    <span style="color:${incident.typeColor || '#fff'};font-weight:700">${incident.type}</span>
+                                                </div>
+                                            </div>
+                                            <div class="mono" style="color: #666; font-size: 0.8rem;">
+                                ${incident.timestamp} • ${incident.location} <br>
+                                <span style="color: #888;">"${incident.description}"</span>
+                                ${incident.hasImage ? '<span style="color: var(--secondary-accent)">[IMG ATTACHED]</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="incident-actions">
+                            ${!isResolved ? `<button onclick="event.stopPropagation(); resolveIncident(${index})">MARK RESOLVED</button>` : `<button onclick="event.stopPropagation(); reopenIncident(${index})">REOPEN</button>`}
+                        </div>
+                    </div>
+                `;
+                listContainer.innerHTML += html;
+            });
+        }
+
+        // --- Hotspot map rendering using Leaflet ---
+        let adminMap = null;
+        let adminLayer = null;
+        let adminCluster = null;
+        function renderHotspotMap(incidents) {
+            if (!window.L) return;
+            const container = document.getElementById('hotspotMap');
+            if (!adminMap) {
+                adminMap = L.map(container).setView([0,0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(adminMap);
+                adminLayer = L.layerGroup().addTo(adminMap);
+            }
+            // use markercluster if available
+            if (window.L && window.L.markerClusterGroup) {
+                if (adminCluster) adminCluster.clearLayers();
+                adminCluster = window.L.markerClusterGroup();
+            } else {
+                adminLayer.clearLayers();
+            }
+
+            const points = [];
+            incidents.forEach(i => {
+                if (!i.location) return;
+                const parts = i.location.split(',').map(s => s.trim());
+                const lat = parseFloat(parts[0]);
+                const lng = parseFloat(parts[1]);
+                if (isNaN(lat) || isNaN(lng)) return;
+                points.push([lat, lng]);
+                const markerOpts = { radius: 6, color: (i.status==='RESOLVED'? '#00ff9d' : '#ff4d00') };
+                const marker = L.circleMarker([lat, lng], markerOpts);
+                marker.bindPopup(`<b>${i.type}</b><br>${i.department || ''}<br>${i.timestamp}<br>${i.location}`);
+                if (adminCluster) adminCluster.addLayer(marker); else adminLayer.addLayer(marker);
+            });
+
+            if (adminCluster) adminMap.addLayer(adminCluster);
+
+            if (points.length) {
+                const bounds = L.latLngBounds(points);
+                adminMap.fitBounds(bounds.pad(0.3));
+            }
+        }
+
+        // 3. Action Logic
+        function resolveIncident(index) {
+            const incidents = JSON.parse(localStorage.getItem('urbanPulseData'));
+            incidents[index].status = 'RESOLVED';
+            localStorage.setItem('urbanPulseData', JSON.stringify(incidents));
+            loadData(); // Re-render
+        }
+
+        function reopenIncident(index) {
+            const incidents = JSON.parse(localStorage.getItem('urbanPulseData'));
+            incidents[index].status = 'OPEN';
+            localStorage.setItem('urbanPulseData', JSON.stringify(incidents));
+            loadData();
+        }
+
+        // Modal handling for incident details
+        let currentModalIndex = null;
+        function showIncidentDetails(index) {
+            const incidents = JSON.parse(localStorage.getItem('urbanPulseData')) || [];
+            const incident = incidents[index];
+            if (!incident) return;
+            currentModalIndex = index;
+            const content = document.getElementById('modalContent');
+            const icon = incident.typeIcon || 'report_problem';
+            const color = incident.typeColor || '#888';
+            content.innerHTML = `
+                <div style="margin-bottom:0.5rem;">ID: <b>${incident.id}</b></div>
+                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                    <span class="material-icons" style="color:${color}">${icon}</span>
+                    <div>Type: <b>${incident.type}</b></div>
+                </div>
+                <div>Department: <b>${incident.department || 'N/A'}</b></div>
+                <div>SLA Due: <b>${incident.slaDue ? new Date(incident.slaDue).toLocaleString() : 'N/A'}</b></div>
+                <div style="margin-top:0.5rem;color:#888;">${incident.timestamp} • ${incident.location}</div>
+                <div style="margin-top:0.8rem;">${incident.description}</div>
+            `;
+            const modal = document.getElementById('incidentModal');
+            const resolveBtn = document.getElementById('modalResolveBtn');
+            const reopenBtn = document.getElementById('modalReopenBtn');
+            if (incident.status === 'RESOLVED') {
+                resolveBtn.style.display = 'none';
+                reopenBtn.style.display = 'inline-block';
+            } else {
+                resolveBtn.style.display = 'inline-block';
+                reopenBtn.style.display = 'none';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeIncidentModal() {
+            document.getElementById('incidentModal').style.display = 'none';
+            currentModalIndex = null;
+        }
+
+        function modalResolve() {
+            if (currentModalIndex !== null) {
+                resolveIncident(currentModalIndex);
+                closeIncidentModal();
+            }
+        }
+
+        function modalReopen() {
+            if (currentModalIndex !== null) {
+                reopenIncident(currentModalIndex);
+                closeIncidentModal();
+            }
+        }
+
+        // Sidebar toggle for mobile
+        function toggleSidebar() {
+            const c = document.getElementById('dashboardContainer');
+            if (c.classList.contains('showSidebar')) c.classList.remove('showSidebar'); else c.classList.add('showSidebar');
+        }
+
+        // Initial check to keep auth screen up
+        document.getElementById('auth-screen').style.display = 'flex';
+    </script>
+</body>
+</html>
