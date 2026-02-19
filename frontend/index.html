@@ -14,15 +14,13 @@
         :root {
             --bg-color: #121212;
             --text-color: #e0e0e0;
-            --accent-color: #ff4d00; /* International Orange */
-            --secondary-accent: #00ff9d; /* Data Green */
+            --accent-color: #ff4d00;
+            --secondary-accent: #00ff9d;
             --surface-color: #1e1e1e;
             --border-color: #333;
-            
             --font-display: 'Archivo Black', sans-serif;
             --font-mono: 'Space Mono', monospace;
             --font-body: 'Inter', sans-serif;
-
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -36,19 +34,16 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* UTILITIES */
         .mono { font-family: var(--font-mono); }
         .display { font-family: var(--font-display); }
         .hidden { display: none !important; }
 
-        /* FILM GRAIN */
         .noise-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 999; opacity: 0.05;
             background: url('https://grainy-gradients.vercel.app/noise.svg');
         }
 
-        /* NAVIGATION */
         nav {
             display: flex; justify-content: space-between; align-items: center;
             padding: 1.5rem 2rem; position: fixed; width: 100%; top: 0; z-index: 100;
@@ -79,7 +74,6 @@
             100% { opacity: 1; box-shadow: 0 0 5px var(--secondary-accent); }
         }
 
-        /* HERO SECTION */
         .hero {
             min-height: 80vh; display: flex; flex-direction: column;
             justify-content: center; align-items: center; padding: 6rem 1rem; position: relative;
@@ -113,7 +107,6 @@
             to { transform: translate(-50%, -50%) rotate(-5deg) scale(1); opacity: 1; }
         }
 
-        /* INTERFACE SECTION */
         .interface-wrapper {
             max-width: 1400px; margin: 0 auto; padding: 2rem; min-height: 100vh;
         }
@@ -196,17 +189,53 @@
         .modal-overlay.open { opacity: 1; pointer-events: auto; }
         .modal-box {
             background: var(--bg-color); border: 1px solid var(--text-color); padding: 2rem;
-            width: 90%; max-width: 400px; transform: translateY(20px);
+            width: 90%; max-width: 440px; transform: translateY(20px);
             transition: transform 0.3s var(--ease-out); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
         .modal-overlay.open .modal-box { transform: translateY(0); }
         .modal-title { font-family: var(--font-display); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 1rem; color: var(--text-color); }
-        .modal-message { font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.5; color: #aaa; margin-bottom: 2rem; }
+        .modal-message { font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.7; color: #aaa; margin-bottom: 2rem; white-space: pre-line; }
         .modal-btn { background: var(--text-color); color: var(--bg-color); border: none; padding: 1rem 2rem; font-family: var(--font-mono); font-weight: 700; cursor: pointer; text-transform: uppercase; width: 100%; }
         .modal-box.success { border-color: var(--secondary-accent); }
         .modal-box.success .modal-title { color: var(--secondary-accent); }
         .modal-box.error { border-color: var(--accent-color); }
         .modal-box.error .modal-title { color: var(--accent-color); }
+
+        /* MAP */
+        .map-container { margin-top: 1rem; }
+        #map { width: 100%; height: 300px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .type-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.9rem; }
+        .type-badge .material-icons { font-size: 1rem; }
+
+        /* TRACKING PANEL */
+        .tracking-panel {
+            margin-top: 2rem;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+        }
+        .tracking-title {
+            font-family: var(--font-mono); font-size: 0.75rem; color: #666;
+            text-transform: uppercase; letter-spacing: 2px; margin-bottom: 1rem;
+            padding-bottom: 0.5rem; border-bottom: 1px solid #222;
+        }
+        .track-item {
+            border-bottom: 1px solid #1e1e1e;
+            padding: 0.8rem 0;
+        }
+        .track-item:last-child { border-bottom: none; }
+        .track-btn {
+            background: transparent; border: 1px solid #333; color: #666;
+            font-family: var(--font-mono); font-size: 0.65rem; padding: 0.3rem 0.7rem;
+            cursor: pointer; text-transform: uppercase; margin-top: 6px;
+            transition: 0.2s; display: inline-block;
+        }
+        .track-btn:hover { border-color: var(--secondary-accent); color: var(--secondary-accent); }
+        .track-status { margin-top: 6px; }
+        .status-pill {
+            display: inline-block; font-family: var(--font-mono); font-size: 0.7rem;
+            padding: 0.2rem 0.6rem; border-radius: 3px; margin-top: 4px;
+        }
 
         @media (max-width: 768px) {
             .hero-title { font-size: 16vw; }
@@ -216,11 +245,6 @@
             nav { padding: 1rem; }
             .file-drop-zone { padding: 3rem 1rem; }
         }
-        /* MAP */
-        .map-container { margin-top: 1rem; }
-        #map { width: 100%; height: 300px; border: 1px solid var(--border-color); border-radius: 6px; }
-        .type-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.9rem; }
-        .type-badge .material-icons { font-size: 1rem; }
     </style>
 </head>
 <body>
@@ -260,6 +284,7 @@
         <div id="citizen-view" class="view-section active">
             <div class="report-grid">
                 
+                <!-- LEFT COLUMN -->
                 <div style="display: flex; flex-direction: column;">
                     <h2 class="display" style="font-size: 2.5rem; margin-bottom: 1rem; color: #fff;">Spot it.<br>Report it.</h2>
                     <p class="mono" style="color: #888; font-size: 0.9rem; line-height: 1.6;">
@@ -269,15 +294,24 @@
                         > Direct routing to municipal grid.
                     </p>
                     
-                    <div style="margin-top: auto; padding-top: 2rem;">
+                    <div style="margin-top: 2rem;">
                         <div class="mono" style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">RECENT ACTIVITY</div>
                         <div style="border-left: 2px solid var(--secondary-accent); padding-left: 1rem;">
                             <div class="mono" style="color: var(--secondary-accent);">#9920 Resolved</div>
                             <div class="mono" style="font-size: 0.8rem;">Water Leak @ Sector 7</div>
                         </div>
                     </div>
+
+                    <!-- CITIZEN TRACKING PANEL -->
+                    <div class="tracking-panel">
+                        <div class="tracking-title">📋 My Submitted Reports</div>
+                        <div id="trackingPanel">
+                            <div class="mono" style="color:#555;font-size:0.8rem;">No reports submitted yet.</div>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- RIGHT COLUMN — FORM -->
                 <form class="brutal-form" onsubmit="handleReport(event)">
                     
                     <div class="input-group">
@@ -343,7 +377,7 @@
     </footer>
 
     <script>
-        // --- 1. Custom Dialog Logic ---
+        // MODAL
         const modal = document.getElementById('customModal');
         const modalBox = document.getElementById('modalBox');
         const modalTitle = document.getElementById('modalTitle');
@@ -352,22 +386,16 @@
         function showDialog(title, message, type = 'normal') {
             modalTitle.innerText = title;
             modalMsg.innerText = message;
-            
             modalBox.className = 'modal-box';
-            
             if (type === 'success') modalBox.classList.add('success');
             if (type === 'error') modalBox.classList.add('error');
-
             modal.classList.add('open');
         }
 
-        function closeModal() {
-            modal.classList.remove('open');
-        }
+        function closeModal() { modal.classList.remove('open'); }
 
-        // --- 2. Tab Navigation ---
+        // TAB NAV
         function setTab(tabName) {
-            // Keep existing UI logic, though Admin now redirects
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.view-section').forEach(section => {
                 section.classList.remove('active');
@@ -375,19 +403,16 @@
             });
             event.target.classList.add('active');
             const targetSection = document.getElementById(tabName + '-view');
-            setTimeout(() => {
-                if(targetSection) targetSection.classList.add('active');
-            }, 100);
+            setTimeout(() => { if(targetSection) targetSection.classList.add('active'); }, 100);
         }
 
-        // --- 3. Image Handling ---
+        // IMAGE HANDLING
         function handleImage(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 const dropZone = document.getElementById('dropZone');
                 const preview = document.getElementById('previewImg');
                 const labelText = document.querySelector('.file-label-text');
-
                 reader.onload = function(e) {
                     preview.src = e.target.result;
                     preview.style.display = 'block';
@@ -398,15 +423,13 @@
             }
         }
 
-        // --- 4. Geolocation Logic ---
+        // GEOLOCATION
         function getLocation() {
             const status = document.getElementById('locStatus');
             const input = document.getElementById('locationInput');
-            
             status.innerText = "TRIANGULATING SIGNAL...";
             status.classList.add('scanning');
             input.placeholder = "SEARCHING...";
-
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(showPosition, showError);
             } else {
@@ -415,10 +438,9 @@
             }
         }
 
-         function showPosition(position) {
+        function showPosition(position) {
             const status = document.getElementById('locStatus');
             const input = document.getElementById('locationInput');
-            
             setTimeout(() => {
                 const lat = position.coords.latitude.toFixed(6);
                 const long = position.coords.longitude.toFixed(6);
@@ -427,57 +449,25 @@
                 status.classList.remove('scanning');
                 status.style.color = "var(--secondary-accent)";
                 showDialog("TARGET ACQUIRED", `Coordinates locked: ${lat}, ${long}`, "success");
-                // Attempt to load and display Google Map under the location input
-                ensureGoogleMaps().then(() => {
-                    initMapAt(parseFloat(lat), parseFloat(long));
-                }).catch(() => {
-                    // If maps cannot load, inform user but keep existing functionality unchanged
-                    console.warn('Google Maps failed to load. Set your API key in the script loader.');
-                });
             }, 1500);
         }
 
-    
-        // --- Simple rule-based classifier & router ---
-        function classifyIncident(description, incidentType) {
-            const text = (description || '').toLowerCase() + ' ' + (incidentType || '').toLowerCase();
-            const mapping = [
-                { keywords: ['water', 'sewer', 'sanitation', 'leak'], dept: 'Water Dept' },
-                { keywords: ['power', 'electric', 'outage', 'transformer'], dept: 'Power & Energy' },
-                { keywords: ['road', 'pothole', 'traffic', 'bridge'], dept: 'Public Works' },
-                { keywords: ['fire', 'smoke'], dept: 'Fire & Rescue' },
-            ];
-
-            for (const m of mapping) {
-                if (m.keywords.some(k => text.indexOf(k) !== -1)) {
-                    return { department: m.dept, confidence: 0.9 };
-                }
-            }
-
-            return { department: 'General Services', confidence: 0.6 };
+        function showError() {
+            const status = document.getElementById('locStatus');
+            status.innerText = "SIGNAL LOST";
+            status.classList.remove('scanning');
+            showDialog("CONNECTION FAILED", "Unable to retrieve location.", "error");
         }
 
-        function slaForType(type) {
-            const t = (type || '').toLowerCase();
-            if (t.indexOf('water') !== -1 || t.indexOf('sanitation') !== -1) return 24; // 24 hours
-            if (t.indexOf('power') !== -1 || t.indexOf('outage') !== -1) return 12; // 12 hours
-            if (t.indexOf('traffic') !== -1 || t.indexOf('road') !== -1) return 48; // 48 hours
-            if (t.indexOf('infrastructure') !== -1) return 72; // 72 hours
-            return 48; // default
-        }
-
-        // --- Incident type metadata (icon & color) ---
+        // TYPE PREVIEW
         function getTypeMeta(type) {
             const t = (type || '').toLowerCase();
             const meta = {
                 'water': { icon: 'water_drop', color: '#00aaff', label: 'Water / Sanitation' },
                 'power': { icon: 'bolt', color: '#ffd100', label: 'Power Outage' },
                 'traffic': { icon: 'traffic', color: '#ff4d00', label: 'Traffic Obstruction' },
-                'road': { icon: 'construction', color: '#ff6b00', label: 'Public Works' },
                 'infrastructure': { icon: 'business', color: '#9b59b6', label: 'Infrastructure' },
-                'sanitation': { icon: 'water_drop', color: '#00aaff', label: 'Water / Sanitation' },
             };
-
             for (const k in meta) {
                 if (t.indexOf(k) !== -1) return meta[k];
             }
@@ -492,96 +482,59 @@
             preview.innerHTML = `<span class="material-icons" style="color:${meta.color}">${meta.icon}</span><span style="color:${meta.color};font-weight:700">${meta.label}</span>`;
         }
 
-        // attach change handler to update preview
         document.addEventListener('DOMContentLoaded', () => {
             const sel = document.getElementById('incidentType');
-            if (sel) {
-                sel.addEventListener('change', updateTypePreview);
-                updateTypePreview();
-            }
+            if (sel) { sel.addEventListener('change', updateTypePreview); updateTypePreview(); }
+            renderTrackingPanel();
         });
 
-        function showError(error) {
-            const status = document.getElementById('locStatus');
-            status.innerText = "SIGNAL LOST";
-            status.classList.remove('scanning');
-            showDialog("CONNECTION FAILED", "Unable to retrieve location.", "error");
+        // CITIZEN TRACKING PANEL
+        function renderTrackingPanel() {
+            const panel = document.getElementById("trackingPanel");
+            if (!panel) return;
+            const myIncidents = JSON.parse(localStorage.getItem("myIncidents") || "[]");
+            if (myIncidents.length === 0) {
+                panel.innerHTML = '<div class="mono" style="color:#555;font-size:0.8rem;">No reports submitted yet.</div>';
+                return;
+            }
+            panel.innerHTML = myIncidents.map(i => `
+                <div class="track-item">
+                    <div class="mono" style="font-size:0.75rem;color:#888;line-height:1.7;">
+                        <b style="color:var(--secondary-accent);letter-spacing:1px;">${i.ref_id}</b><br>
+                        ${i.description.substring(0, 55)}${i.description.length > 55 ? '...' : ''}<br>
+                        <span style="color:#444;">${i.submitted_at}</span>
+                    </div>
+                    <button class="track-btn" onclick="checkStatus('${i.ref_id}')">CHECK STATUS →</button>
+                    <div id="status-${i.ref_id}" class="track-status"></div>
+                </div>
+            `).join('');
         }
 
-        // --- 5. Form Submission & Storage ---
-        function handleReport(e) {
-            e.preventDefault();
-            
-            const btn = document.getElementById('submitBtn');
-            const btnText = document.getElementById('btnText');
-            const originalText = "Transmit Data";
-
-            // 1. Gather Data
-            const type = document.getElementById('incidentType').value;
-            const location = document.getElementById('locationInput').value || "Unknown Coordinates";
-            const desc = document.getElementById('desc').value || "No details provided";
-            const hasImage = document.getElementById('evidenceFile').files.length > 0;
-            const id = 'INC-' + Math.floor(Math.random() * 9000 + 1000);
-
-            // 2. Visual Processing State
-            btnText.innerText = "UPLOADING...";
-            btn.style.backgroundColor = "var(--accent-color)";
-            btn.style.color = "white";
-
-            setTimeout(() => {
-                // 3. Save to Local Storage
-                // auto-classify and route
-                const classification = classifyIncident(desc, type);
-                const slaHours = slaForType(type); // SLA window per incident type (hours)
-                const createdAt = new Date();
-                const slaDue = new Date(createdAt.getTime() + slaHours * 60 * 60 * 1000).toISOString();
-
-                const newIncident = {
-                    id: id,
-                    type: type,
-                    location: location,
-                    description: desc,
-                    status: 'OPEN',
-                    timestamp: createdAt.toLocaleString(),
-                    hasImage: hasImage,
-                    department: classification.department,
-                    classificationConfidence: classification.confidence,
-                    slaDue: slaDue
-                };
-                // add icon/color metadata for consistent rendering in admin
-                try {
-                    const meta = getTypeMeta(type);
-                    newIncident.typeIcon = meta.icon;
-                    newIncident.typeColor = meta.color;
-                } catch(e) {}
-
-                const existingData = JSON.parse(localStorage.getItem('urbanPulseData')) || [];
-                existingData.unshift(newIncident);
-                localStorage.setItem('urbanPulseData', JSON.stringify(existingData));
-
-                // 4. Success State
-                btnText.innerText = "SENT";
-                btn.style.backgroundColor = "var(--secondary-accent)";
-                btn.style.color = "black";
-                
-                setTimeout(() => {
-                    showDialog("TRANSMISSION COMPLETE", `Incident Report #${id} has been routed to dispatch.`, "success");
-                    e.target.reset();
-                    
-                    // Reset visual elements
-                    document.getElementById('dropZone').classList.remove('has-image');
-                    document.getElementById('previewImg').style.display = 'none';
-                    document.querySelector('.file-label-text').style.display = 'block';
-                    document.getElementById('locStatus').innerText = "WAITING FOR SATELLITE...";
-                    document.getElementById('locStatus').style.color = "#666";
-                    
-                    btnText.innerText = originalText;
-                    btn.style.backgroundColor = "white";
-                    btn.style.color = "black";
-                }, 1000);
-            }, 2000);
-        }
+        window.checkStatus = async function(refId) {
+            const el = document.getElementById(`status-${refId}`);
+            el.innerHTML = '<span class="mono" style="font-size:0.7rem;color:#555;">FETCHING...</span>';
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/track/${refId}`);
+                if (!res.ok) throw new Error("Not found");
+                const data = await res.json();
+                const statusColor = data.status === "RESOLVED" ? "#00ff9d" : "#ff4d00";
+                const sevColor = data.severity === "HIGH" ? "#ff4d00" : data.severity === "MEDIUM" ? "#ffcc00" : "#00bfff";
+                el.innerHTML = `
+                    <div style="margin-top:6px;padding:8px 10px;background:#181818;border:1px solid #2a2a2a;border-radius:4px;">
+                        <div class="mono" style="font-size:0.72rem;line-height:1.9;color:#aaa;">
+                            Status: <b style="color:${statusColor};">${data.status}</b><br>
+                            Severity: <b style="color:${sevColor};">${data.severity}</b><br>
+                            Dept: <b style="color:#e0e0e0;">${data.department}</b><br>
+                            ${data.resolved_at ? `<span style="color:#00ff9d;">✓ Resolved</span>` : `<span style="color:#555;">Pending resolution</span>`}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                el.innerHTML = '<span class="mono" style="font-size:0.7rem;color:#ff4d00;">Could not fetch — is server running?</span>';
+            }
+        };
     </script>
+
     <script type="module" src="js/report.js"></script>
 
 </body>
