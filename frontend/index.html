@@ -415,7 +415,7 @@
             }
         }
 
-        function showPosition(position) {
+         function showPosition(position) {
             const status = document.getElementById('locStatus');
             const input = document.getElementById('locationInput');
             
@@ -437,72 +437,7 @@
             }, 1500);
         }
 
-        // --- Google Maps helper (loads API then initializes a draggable marker) ---
-        let _gmapsLoading = null;
-        let map = null;
-        let marker = null;
-
-        function ensureGoogleMaps() {
-            // Replace YOUR_API_KEY with a valid Google Maps JavaScript API key.
-            if (window.google && window.google.maps) return Promise.resolve();
-            if (_gmapsLoading) return _gmapsLoading;
-
-            _gmapsLoading = new Promise((resolve, reject) => {
-                window.onGoogleMapsLoaded = function() { resolve(); };
-                const script = document.createElement('script');
-                script.async = true;
-                script.defer = true;
-                script.src = 'https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=onGoogleMapsLoaded';
-                script.onerror = function() { reject(new Error('Google Maps script failed to load')); };
-                document.head.appendChild(script);
-            });
-            return _gmapsLoading;
-        }
-
-        function initMapAt(lat, lng) {
-            const mapContainer = document.getElementById('mapContainer');
-            mapContainer.classList.remove('hidden');
-
-            const mapEl = document.getElementById('map');
-            if (!map) {
-                map = new google.maps.Map(mapEl, {
-                    center: { lat: lat, lng: lng },
-                    zoom: 16,
-                    streetViewControl: false,
-                });
-
-                marker = new google.maps.Marker({
-                    position: { lat: lat, lng: lng },
-                    map: map,
-                    draggable: true,
-                    title: 'Drag to adjust location'
-                });
-
-                // When marker dragged, update the input
-                marker.addListener('dragend', function() {
-                    const p = marker.getPosition();
-                    updateLocationInput(p.lat(), p.lng());
-                });
-
-                // Click on map to move marker
-                map.addListener('click', function(e) {
-                    const p = e.latLng;
-                    marker.setPosition(p);
-                    map.panTo(p);
-                    updateLocationInput(p.lat(), p.lng());
-                });
-            } else {
-                const pos = { lat: lat, lng: lng };
-                map.setCenter(pos);
-                marker.setPosition(pos);
-            }
-        }
-
-        function updateLocationInput(lat, lng) {
-            const input = document.getElementById('locationInput');
-            input.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-        }
-
+    
         // --- Simple rule-based classifier & router ---
         function classifyIncident(description, incidentType) {
             const text = (description || '').toLowerCase() + ' ' + (incidentType || '').toLowerCase();
@@ -647,5 +582,7 @@
             }, 2000);
         }
     </script>
+    <script type="module" src="js/report.js"></script>
+
 </body>
 </html>
