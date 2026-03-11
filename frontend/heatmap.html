@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UrbanPulse | Live Incident Heatmap</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        :root {
+            --bg: #0a0a0a; --text: #e0e0e0; --accent: #ff4d00;
+            --green: #00ff9d; --surface: #141414; --border: #222;
+            --mono: 'Space Mono', monospace; --display: 'Archivo Black', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .noise-overlay { position:fixed; inset:0; pointer-events:none; opacity:0.04; background:url('https://grainy-gradients.vercel.app/noise.svg'); z-index:999; }
+
+        /* NAV */
+        nav { padding: 0.8rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #000; flex-shrink: 0; z-index: 100; }
+        .nav-logo { font-family: var(--mono); font-weight: 700; font-size: 1rem; letter-spacing: -1px; }
+        .nav-links { display: flex; gap: 1rem; }
+        .nav-link { font-family: var(--mono); font-size: 0.72rem; color: #555; text-decoration: none; padding: 0.3rem 0.7rem; border: 1px solid transparent; transition: 0.2s; }
+        .nav-link:hover { color: white; border-color: #333; }
+        .nav-link.active { color: var(--green); border-color: #1a3a1a; }
+
+        /* CONTROLS BAR */
+        .controls { padding: 0.6rem 1.5rem; background: #0a0a0a; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex-shrink: 0; }
+        .ctrl-label { font-family: var(--mono); font-size: 0.68rem; color: #444; text-transform: uppercase; }
+        .ctrl-select { background: #111; border: 1px solid #222; color: #aaa; font-family: var(--mono); font-size: 0.72rem; padding: 0.3rem 0.6rem; outline: none; cursor: pointer; }
+        .ctrl-search { background: #111; border: 1px solid #222; color: #aaa; font-family: var(--mono); font-size: 0.72rem; padding: 0.3rem 0.7rem; outline: none; flex: 1; min-width: 180px; max-width: 300px; }
+        .ctrl-search:focus { border-color: #444; }
+        .view-toggle { display: flex; }
+        .view-btn { background: none; border: 1px solid #222; color: #555; font-family: var(--mono); font-size: 0.68rem; padding: 0.3rem 0.8rem; cursor: pointer; transition: 0.2s; }
+        .view-btn.active { background: #1a1a1a; color: white; border-color: #444; }
+        .live-badge { font-family: var(--mono); font-size: 0.65rem; color: var(--green); display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+        .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 2s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        /* MAP */
+        #map { flex: 1; width: 100%; }
+
+        /* STATS OVERLAY */
+        #statsBar { position: absolute; top: 110px; left: 16px; z-index: 500; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+        .stat-pill { background: rgba(0,0,0,0.85); border: 1px solid #222; padding: 0.5rem 0.8rem; font-family: var(--mono); font-size: 0.7rem; display: flex; align-items: center; gap: 0.6rem; backdrop-filter: blur(4px); }
+        .stat-num { font-family: var(--display); font-size: 1.4rem; line-height: 1; }
+
+        /* INCIDENT LIST PANEL */
+        #listPanel { display: none; flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+        .list-card { border: 1px solid var(--border); background: #111; padding: 1rem 1.2rem; margin-bottom: 0.6rem; display: grid; grid-template-columns: 10px 1fr; gap: 1rem; align-items: start; cursor: pointer; transition: 0.2s; }
+        .list-card:hover { border-color: #444; transform: translateX(3px); }
+        .list-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
+        .list-meta { font-family: var(--mono); font-size: 0.75rem; color: #aaa; line-height: 1.8; }
+        .badge { display: inline-block; font-family: var(--mono); font-size: 0.6rem; padding: 0.1rem 0.4rem; border-radius: 2px; border: 1px solid; margin-right: 0.3rem; }
+
+        /* LEGEND */
+        #legend { position: absolute; bottom: 30px; right: 16px; z-index: 500; background: rgba(0,0,0,0.88); border: 1px solid #222; padding: 0.8rem 1rem; font-family: var(--mono); font-size: 0.68rem; color: #aaa; line-height: 2; backdrop-filter: blur(4px); }
+        .leg-title { color: #444; font-size: 0.6rem; letter-spacing: 1px; margin-bottom: 4px; }
+
+        /* SEARCH RESULTS PANEL */
+        #searchResults { position: absolute; top: 130px; right: 16px; z-index: 500; background: rgba(10,10,10,0.95); border: 1px solid #222; max-width: 300px; max-height: 300px; overflow-y: auto; display: none; }
+        .search-item { padding: 0.6rem 0.9rem; border-bottom: 1px solid #1a1a1a; cursor: pointer; font-family: var(--mono); font-size: 0.72rem; color: #888; transition: 0.15s; }
+        .search-item:hover { background: #111; color: white; }
+        .search-item b { color: var(--accent); }
+    </style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<!-- NAV -->
+<nav>
+    <div class="nav-logo">UrbanPulse_</div>
+    <div class="nav-links">
+        <a class="nav-link" href="index.html">Report</a>
+        <a class="nav-link active" href="heatmap.html">Live Map</a>
+        <a class="nav-link" href="admin.html">Admin</a>
+    </div>
+</nav>
+
+<!-- CONTROLS -->
+<div class="controls">
+    <span class="ctrl-label">Filter:</span>
+    <select id="c-status"   class="ctrl-select" onchange="applyFilter()">
+        <option value="">All Status</option>
+        <option>OPEN</option>
+        <option>UNDER REVIEW</option>
+        <option>IN PROGRESS</option>
+        <option>RESOLVED</option>
+    </select>
+    <select id="c-severity" class="ctrl-select" onchange="applyFilter()">
+        <option value="">All Severity</option>
+        <option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+    </select>
+    <select id="c-category" class="ctrl-select" onchange="applyFilter()">
+        <option value="">All Types</option>
+        <option>Infrastructure Damage</option>
+        <option>Water / Sanitation</option>
+        <option>Power Outage</option>
+        <option>Traffic Obstruction</option>
+    </select>
+    <input id="c-search" class="ctrl-search" placeholder="Search by area or description..." oninput="onSearch()">
+    <div class="view-toggle">
+        <button class="view-btn active" id="btn-map"  onclick="setView('map')">MAP</button>
+        <button class="view-btn"        id="btn-list" onclick="setView('list')">LIST</button>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+</div>
+
+<!-- MAIN AREA (map + list toggle) -->
+<div style="position:relative;flex:1;display:flex;overflow:hidden;">
+    <div id="map"></div>
+    <div id="listPanel"></div>
+
+    <!-- STATS OVERLAY -->
+    <div id="statsBar">
+        <div class="stat-pill"><div class="stat-num" id="s-total" style="color:white;">0</div><span>Total</span></div>
+        <div class="stat-pill"><div class="stat-num" id="s-open"  style="color:#ff4d00;">0</div><span>Open</span></div>
+        <div class="stat-pill"><div class="stat-num" id="s-resolved" style="color:#00ff9d;">0</div><span>Resolved</span></div>
+    </div>
+
+    <!-- SEARCH RESULTS -->
+    <div id="searchResults"></div>
+
+    <!-- LEGEND -->
+    <div id="legend">
+        <div class="leg-title">SEVERITY</div>
+        <div><span style="color:#ff4d00;">&#11044;</span> HIGH &nbsp; <span style="color:#ffcc00;">&#11044;</span> MEDIUM &nbsp; <span style="color:#00bfff;">&#11044;</span> LOW</div>
+        <div class="leg-title" style="margin-top:6px;">HEATMAP</div>
+        <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:80px;height:6px;background:linear-gradient(to right,green,yellow,orange,red);border-radius:3px;"></div>
+            <span style="color:#444;font-size:0.6rem;">low → high</span>
+        </div>
+    </div>
+</div>
+
+<script>
+var API   = 'http://127.0.0.1:8000';
+var map   = null, markerLayer = null, heatLayer = null;
+var allData = [];
+var refreshInterval = null;
+
+// ── INIT MAP ──────────────────────────────────────────────────────────
+function initMap() {
+    map = L.map('map', {zoomControl: true}).setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────────────
+async function loadData() {
+    try {
+        var res = await fetch(API + '/public/heatmap');
+        if (!res.ok) throw new Error();
+        allData = await res.json();
+        applyFilter();
+        updateStats(allData);
+    } catch(e) {
+        console.warn('Backend offline — showing demo data');
+        allData = [];
+        applyFilter();
+    }
+}
+
+function updateStats(data) {
+    document.getElementById('s-total').innerText    = data.length;
+    document.getElementById('s-open').innerText     = data.filter(function(i){return i.status==='OPEN';}).length;
+    document.getElementById('s-resolved').innerText = data.filter(function(i){return i.status==='RESOLVED';}).length;
+}
+
+// ── FILTER & RENDER ───────────────────────────────────────────────────
+function applyFilter() {
+    var status   = document.getElementById('c-status').value;
+    var severity = document.getElementById('c-severity').value;
+    var category = document.getElementById('c-category').value;
+    var search   = document.getElementById('c-search').value.toLowerCase();
+
+    var filtered = allData.filter(function(i) {
+        if (status   && i.status   !== status)                                  return false;
+        if (severity && i.severity !== severity)                                return false;
+        if (category && i.category !== category)                                return false;
+        if (search   && i.description && i.description.toLowerCase().indexOf(search) === -1) return false;
+        return true;
+    });
+
+    renderMap(filtered);
+    renderList(filtered);
+    updateStats(filtered);
+}
+
+function severityColor(s) {
+    return s === 'HIGH' ? '#ff4d00' : s === 'MEDIUM' ? '#ffcc00' : '#00bfff';
+}
+
+function statusColor(s) {
+    return s==='RESOLVED'?'#00ff9d':s==='IN PROGRESS'?'#00aaff':s==='UNDER REVIEW'?'#ffcc00':'#ff4d00';
+}
+
+function typeMeta(cat) {
+    var t = (cat||'').toLowerCase();
+    if (t.indexOf('water')!=-1||t.indexOf('sanitation')!=-1) return {icon:'water_drop',color:'#00aaff'};
+    if (t.indexOf('power')!=-1||t.indexOf('outage')!=-1)     return {icon:'bolt',      color:'#ffd100'};
+    if (t.indexOf('traffic')!=-1)                             return {icon:'traffic',   color:'#ff4d00'};
+    if (t.indexOf('infrastructure')!=-1)                      return {icon:'business',  color:'#9b59b6'};
+    return {icon:'report_problem', color:'#888'};
+}
+
+// ── RENDER MAP ────────────────────────────────────────────────────────
+function renderMap(data) {
+    markerLayer.clearLayers();
+    if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+
+    var points = [], heat = [], wt = {HIGH:1.0, MEDIUM:0.6, LOW:0.3};
+
+    data.forEach(function(i) {
+        var lat = parseFloat(i.latitude), lng = parseFloat(i.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        points.push([lat, lng]);
+        heat.push([lat, lng, wt[i.severity] || 0.5]);
+
+        var ring = severityColor(i.severity);
+        var meta = typeMeta(i.category);
+        var icon = L.divIcon({
+            className: '',
+            html: '<div style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.85);border:2px solid '+ring+';display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px '+ring+'77;font-family:\'Material Icons\';font-size:14px;color:'+meta.color+';">'+meta.icon+'</div>',
+            iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-18]
+        });
+
+        var stColor = statusColor(i.status);
+        var marker  = L.marker([lat, lng], {icon: icon});
+        marker.bindPopup(
+            '<div style="font-family:monospace;font-size:0.78rem;line-height:1.9;min-width:190px;color:#ccc;">'
+            + '<b style="color:'+meta.color+'">'+i.category+'</b><br>'
+            + (i.description ? i.description.substring(0,80)+(i.description.length>80?'...':'') : '') + '<br>'
+            + 'Severity: <b style="color:'+ring+'">'+i.severity+'</b><br>'
+            + 'Status: <b style="color:'+stColor+'">'+i.status+'</b><br>'
+            + (i.created_at ? '<span style="color:#555;font-size:0.7rem;">'+timeAgo(i.created_at)+'</span>' : '')
+            + '</div>'
+        );
+        markerLayer.addLayer(marker);
+    });
+
+    if (heat.length && window.L && L.heatLayer) {
+        heatLayer = L.heatLayer(heat, {
+            radius: 40, blur: 28, maxZoom: 17, max: 1.0,
+            gradient: {0: 'green', 0.4: 'yellow', 0.7: 'orange', 1.0: 'red'}
+        }).addTo(map);
+    }
+
+    if (points.length > 0) {
+        map.fitBounds(L.latLngBounds(points).pad(0.3));
+    }
+    setTimeout(function(){ map.invalidateSize(); }, 100);
+}
+
+// ── RENDER LIST ───────────────────────────────────────────────────────
+function renderList(data) {
+    var panel = document.getElementById('listPanel');
+    if (data.length === 0) {
+        panel.innerHTML = '<div style="text-align:center;color:#333;margin-top:4rem;font-family:var(--mono);">[ NO INCIDENTS MATCH FILTER ]</div>';
+        return;
+    }
+    panel.innerHTML = data.map(function(i) {
+        var ring    = severityColor(i.severity);
+        var stColor = statusColor(i.status);
+        return '<div class="list-card" onclick="focusIncident(' + i.latitude + ',' + i.longitude + ')">'
+            + '<div class="list-dot" style="background:'+ring+';box-shadow:0 0 6px '+ring+';"></div>'
+            + '<div class="list-meta">'
+            + '<span class="badge" style="color:'+stColor+';border-color:'+stColor+'44;">'+i.status+'</span>'
+            + '<span class="badge" style="color:'+ring+';border-color:'+ring+'44;">'+i.severity+'</span>'
+            + '<b style="color:#ddd;">'+i.category+'</b><br>'
+            + (i.description ? i.description.substring(0,70)+'...' : '') + '<br>'
+            + '<span style="color:#444;">' + (i.created_at ? timeAgo(i.created_at) : '') + '</span>'
+            + '</div></div>';
+    }).join('');
+}
+
+function focusIncident(lat, lng) {
+    if (isNaN(lat) || isNaN(lng)) return;
+    setView('map');
+    map.setView([lat, lng], 14);
+    setTimeout(function(){ map.invalidateSize(); }, 100);
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────
+function onSearch() {
+    var q   = document.getElementById('c-search').value.toLowerCase().trim();
+    var box = document.getElementById('searchResults');
+    applyFilter();
+    if (!q || q.length < 2) { box.style.display = 'none'; return; }
+    var matches = allData.filter(function(i) {
+        return i.description && i.description.toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 8);
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = matches.map(function(i) {
+        var ring = severityColor(i.severity);
+        var desc = (i.description||'').substring(0, 60);
+        var hl   = desc.replace(new RegExp('(' + q + ')', 'gi'), '<b>$1</b>');
+        return '<div class="search-item" onclick="focusIncident('+i.latitude+','+i.longitude+')">'
+             + '<span style="color:'+ring+';">&#11044;</span> ' + hl + '</div>';
+    }).join('');
+}
+
+document.addEventListener('click', function(e) {
+    if (!document.getElementById('c-search').contains(e.target)) {
+        document.getElementById('searchResults').style.display = 'none';
+    }
+});
+
+// ── VIEW TOGGLE ───────────────────────────────────────────────────────
+function setView(v) {
+    document.getElementById('btn-map').classList.toggle('active',  v==='map');
+    document.getElementById('btn-list').classList.toggle('active', v==='list');
+    document.getElementById('map').style.display        = v==='map'  ? 'block' : 'none';
+    document.getElementById('listPanel').style.display  = v==='list' ? 'block' : 'none';
+    document.getElementById('statsBar').style.display   = v==='map'  ? 'flex'  : 'none';
+    document.getElementById('legend').style.display     = v==='map'  ? 'block' : 'none';
+    if (v==='map') setTimeout(function(){ map.invalidateSize(); }, 100);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function timeAgo(iso) {
+    if (!iso) return '';
+    var diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)    return diff + 's ago';
+    if (diff < 3600)  return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    return Math.floor(diff/86400) + 'd ago';
+}
+
+// ── SSE: live updates ─────────────────────────────────────────────────
+function connectHeatmapSSE() {
+    var src = new EventSource(API + '/stream');
+    src.addEventListener('new_incident', function(e) {
+        var d = JSON.parse(e.data);
+        showBanner('New ' + d.severity + ' incident: ' + d.category);
+        loadData();
+    });
+    src.addEventListener('status_update', function() { loadData(); });
+    src.onerror = function() { setTimeout(connectHeatmapSSE, 5000); };
+}
+
+function showBanner(msg) {
+    var b = document.getElementById('liveBanner');
+    if (!b) {
+        b = document.createElement('div');
+        b.id = 'liveBanner';
+        b.style.cssText = 'position:fixed;top:96px;left:0;right:0;z-index:800;'
+            + 'background:#0a1a00;border-bottom:1px solid #00ff9d;color:#00ff9d;'
+            + 'font-family:var(--mono);font-size:0.72rem;padding:0.45rem 1.5rem;text-align:center;';
+        document.body.appendChild(b);
+    }
+    b.innerText = '▸ LIVE: ' + msg;
+    b.style.display = 'block';
+    clearTimeout(b._timer);
+    b._timer = setTimeout(function() { b.style.display = 'none'; }, 5000);
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+    initMap();
+    loadData();
+    connectHeatmapSSE();
+    refreshInterval = setInterval(loadData, 60000); // slow fallback
+});
+</script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+</body>
+</html>

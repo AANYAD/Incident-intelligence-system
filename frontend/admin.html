@@ -9,344 +9,621 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
         :root {
-            --bg-color: #0a0a0a; --text-color: #e0e0e0; --accent-color: #ff4d00;
-            --secondary-accent: #00ff9d; --surface-color: #141414; --border-color: #333;
-            --font-display: 'Archivo Black', sans-serif; --font-mono: 'Space Mono', monospace;
+            --bg: #0a0a0a; --text: #e0e0e0; --accent: #ff4d00;
+            --green: #00ff9d; --surface: #141414; --border: #333;
+            --mono: 'Space Mono', monospace; --display: 'Archivo Black', sans-serif;
         }
-        body { background: var(--bg-color); color: var(--text-color); font-family: 'Inter', sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
-        .mono { font-family: var(--font-mono); }
-        .display { font-family: var(--font-display); }
-        .noise-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.05; background: url('https://grainy-gradients.vercel.app/noise.svg'); z-index: 999; }
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 2000; display: flex; justify-content: center; align-items: center; flex-direction: column; }
-        .auth-box { border: 1px solid var(--border-color); padding: 3rem; background: var(--surface-color); text-align: center; }
-        .auth-input { background: transparent; border: 1px solid #444; color: white; padding: 0.8rem; margin: 1rem 0; width: 200px; text-align: center; font-family: var(--font-mono); }
-        .auth-btn { background: white; color: black; border: none; padding: 0.8rem 2rem; cursor: pointer; font-family: var(--font-display); text-transform: uppercase; }
-        nav { padding: 1rem 2rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #000; }
-        .dashboard-container { flex: 1; display: grid; grid-template-columns: 300px 1fr; overflow: hidden; }
-        .sidebar { border-right: 1px solid var(--border-color); padding: 2rem; background: var(--surface-color); overflow-y: auto; }
-        .stat-card { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #222; }
-        .stat-val { font-size: 3rem; font-family: var(--font-display); line-height: 1; }
-        .stat-label { color: #666; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
-        .feed { padding: 2rem; overflow-y: auto; }
-        .feed-header { display: flex; justify-content: space-between; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-        .incident-card { background: #111; border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1rem; display: grid; grid-template-columns: 30px 1fr auto; gap: 1.5rem; align-items: start; transition: 0.2s; }
-        .incident-card:hover { border-color: #555; transform: translateX(5px); }
-        .incident-card.sla-breached { border-color: #ff4d00 !important; box-shadow: 0 0 10px #ff4d0044; }
-        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: var(--accent-color); box-shadow: 0 0 10px var(--accent-color); margin-top: 4px; }
-        .status-indicator.resolved { background: var(--secondary-accent); box-shadow: 0 0 10px var(--secondary-accent); opacity: 0.5; }
-        .incident-actions button { background: transparent; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; cursor: pointer; font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; transition: 0.2s; display: block; width: 100%; margin-bottom: 0.4rem; }
-        .incident-actions button:hover { background: var(--text-color); color: black; }
-        .sla-badge { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 3px; display: inline-block; margin-top: 4px; }
-        .sla-badge.ok { background: #1a3a1a; color: var(--secondary-accent); border: 1px solid #00ff9d44; }
-        .sla-badge.warning { background: #3a3a00; color: #ffcc00; border: 1px solid #ffcc0044; }
-        .sla-badge.breached { background: #3a0a00; color: #ff4d00; border: 1px solid #ff4d0044; animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .dept-badge { font-family: var(--font-mono); font-size: 0.65rem; color: #888; border: 1px solid #333; padding: 0.15rem 0.4rem; border-radius: 3px; display: inline-block; }
-        .time-ago { font-family: var(--font-mono); font-size: 0.7rem; color: #555; }
-        .empty-state { text-align: center; color: #444; margin-top: 4rem; font-family: var(--font-mono); }
-        #hotspotMap { height: 320px; width: 100%; margin-bottom: 1rem; border: 1px solid #222; position: relative; z-index: 1; }
-        @media (max-width: 900px) {
-            .dashboard-container { grid-template-columns: 1fr; }
-            .sidebar { position: fixed; left: 0; top: 56px; bottom: 0; width: 80%; max-width: 320px; transform: translateX(-110%); transition: transform 0.25s ease; z-index: 2000; }
-            #hotspotMap { height: 220px; }
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        .mono    { font-family: var(--mono); }
+        .display { font-family: var(--display); }
+        .noise-overlay { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity:0.04; background:url('https://grainy-gradients.vercel.app/noise.svg'); z-index:999; }
+
+        /* AUTH */
+        #auth-screen { position:fixed; inset:0; background:var(--bg); z-index:2000; display:flex; justify-content:center; align-items:center; }
+        .auth-box { border:1px solid var(--border); padding:3rem; background:var(--surface); text-align:center; width:340px; }
+        .auth-input { background:transparent; border:none; border-bottom:1px solid #444; color:white; padding:0.7rem 0; width:100%; font-family:var(--mono); font-size:0.9rem; outline:none; display:block; margin-bottom:1.2rem; }
+        .auth-input:focus { border-bottom-color: var(--accent); }
+        .auth-btn { background:white; color:black; border:none; padding:0.8rem 2rem; cursor:pointer; font-family:var(--display); text-transform:uppercase; width:100%; margin-top:0.5rem; font-size:1rem; }
+        .auth-hints { color:#2a2a2a; font-family:var(--mono); font-size:0.62rem; margin-top:1.5rem; line-height:1.9; }
+
+        /* NAV */
+        nav { padding:1rem 2rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:#000; flex-shrink:0; }
+        .nav-logout { background:none; border:1px solid #333; color:white; padding:0.3rem 0.8rem; cursor:pointer; font-family:var(--mono); font-size:0.75rem; }
+
+        /* LAYOUT */
+        .dashboard-container { flex:1; display:grid; grid-template-columns:280px 1fr; overflow:hidden; }
+        .sidebar { border-right:1px solid var(--border); padding:2rem; background:var(--surface); overflow-y:auto; }
+        .stat-card { margin-bottom:2rem; padding-bottom:2rem; border-bottom:1px solid #1a1a1a; }
+        .stat-val   { font-size:3rem; font-family:var(--display); line-height:1; }
+        .stat-label { color:#555; font-family:var(--mono); font-size:0.75rem; text-transform:uppercase; margin-top:0.3rem; }
+        .feed { padding:2rem; overflow-y:auto; }
+
+        /* TABS */
+        .tab-bar { display:flex; border-bottom:1px solid #222; margin-bottom:1.5rem; }
+        .feed-tab { background:none; border:none; border-bottom:2px solid transparent; color:#555; font-family:var(--mono); font-size:0.82rem; text-transform:uppercase; padding:0.5rem 1.5rem; cursor:pointer; margin-bottom:-1px; transition:0.2s; }
+        .feed-tab.active { color:white; border-bottom-color:var(--accent); }
+
+        /* FILTERS */
+        .filter-bar { display:flex; gap:0.5rem; flex-wrap:wrap; padding:0.8rem 1rem; background:#0f0f0f; border:1px solid #1a1a1a; margin-bottom:1rem; }
+        .filter-select, .filter-input { background:#1a1a1a; border:1px solid #2a2a2a; color:#aaa; font-family:var(--mono); font-size:0.72rem; padding:0.35rem 0.6rem; outline:none; }
+        .filter-input { flex:1; min-width:150px; }
+        .filter-clear { background:none; border:1px solid #2a2a2a; color:#555; font-family:var(--mono); font-size:0.72rem; padding:0.35rem 0.7rem; cursor:pointer; }
+        .filter-clear:hover { border-color:var(--accent); color:var(--accent); }
+
+        /* FEED HEADER */
+        .feed-header { display:flex; justify-content:space-between; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem; }
+
+        /* INCIDENT CARDS */
+        .incident-card { background:#111; border:1px solid var(--border); padding:1.5rem; margin-bottom:1rem; display:grid; grid-template-columns:14px 1fr auto; gap:1.5rem; align-items:start; transition:0.2s; }
+        .incident-card:hover { border-color:#555; transform:translateX(4px); }
+        .incident-card.sla-breached { border-color:var(--accent) !important; box-shadow:0 0 10px #ff4d0033; }
+        .status-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); margin-top:4px; }
+        .status-dot.resolved { background:var(--green); box-shadow:0 0 8px var(--green); opacity:0.5; }
+        .incident-actions button { background:transparent; border:1px solid var(--border); color:var(--text); padding:0.4rem 0.8rem; cursor:pointer; font-family:var(--mono); font-size:0.68rem; text-transform:uppercase; transition:0.2s; display:block; width:100%; margin-bottom:0.4rem; }
+        .incident-actions button:hover { background:var(--text); color:black; }
+        .dept-badge { font-family:var(--mono); font-size:0.62rem; color:#777; border:1px solid #2a2a2a; padding:0.12rem 0.4rem; border-radius:2px; display:inline-block; }
+        .time-ago   { font-family:var(--mono); font-size:0.68rem; color:#444; }
+
+        /* SLA BADGES */
+        .sla-badge { font-family:var(--mono); font-size:0.62rem; padding:0.2rem 0.5rem; border-radius:3px; display:inline-block; margin-top:4px; }
+        .sla-badge.ok       { background:#1a3a1a; color:var(--green);  border:1px solid #00ff9d33; }
+        .sla-badge.warning  { background:#3a3a00; color:#ffcc00;        border:1px solid #ffcc0033; }
+        .sla-badge.breached { background:#3a0a00; color:var(--accent);  border:1px solid #ff4d0033; animation:pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+        /* MAP */
+        #hotspotMap { height:300px; width:100%; margin-bottom:1rem; border:1px solid #1a1a1a; position:relative; z-index:1; }
+
+        /* ANALYTICS */
+        .analytics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.2rem; margin-bottom:2rem; }
+        .analytics-card { background:#111; border:1px solid #1a1a1a; padding:1.5rem; }
+        .analytics-title { font-family:var(--mono); font-size:0.68rem; color:#444; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.8rem; }
+        .analytics-val   { font-family:var(--display); font-size:2.5rem; line-height:1; }
+        .bar-row   { display:flex; align-items:center; gap:0.8rem; margin-bottom:0.6rem; font-family:var(--mono); font-size:0.7rem; }
+        .bar-label { width:130px; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .bar-track { flex:1; background:#1a1a1a; height:5px; border-radius:3px; overflow:hidden; }
+        .bar-fill  { height:100%; border-radius:3px; transition:width 0.6s; }
+        .bar-count { color:#444; min-width:20px; text-align:right; }
+
+        /* COMMENTS */
+        .comment-thread { margin-top:0.8rem; border-top:1px solid #1a1a1a; padding-top:0.6rem; }
+        .comment-bubble { padding:0.4rem 0.7rem; margin-bottom:0.4rem; font-family:var(--mono); font-size:0.7rem; line-height:1.6; border-radius:2px; }
+        .comment-bubble.citizen   { background:#12122a; border-left:2px solid #333; }
+        .comment-bubble.authority { background:#0a1e12; border-left:2px solid var(--green); }
+        .comment-bubble.internal  { background:#1a1200; border-left:2px solid #ffcc00; }
+        .c-author { font-size:0.6rem; color:#444; margin-bottom:2px; }
+        .comment-row { display:flex; gap:0.4rem; margin-top:0.6rem; align-items:center; }
+        .comment-toggle { background:transparent; border:1px solid #2a2200; color:#666; font-family:var(--mono); font-size:0.62rem; padding:0.25rem 0.5rem; cursor:pointer; white-space:nowrap; }
+        .comment-toggle.internal { border-color:#ffcc00; color:#ffcc00; }
+        .comment-text-input { flex:1; background:transparent; border:1px solid #2a2a2a; color:white; font-family:var(--mono); font-size:0.7rem; padding:0.3rem 0.5rem; outline:none; }
+        .comment-text-input:focus { border-color:#444; }
+        .comment-send-btn { background:transparent; border:1px solid #333; color:#777; font-family:var(--mono); font-size:0.65rem; padding:0.3rem 0.7rem; cursor:pointer; white-space:nowrap; }
+        .comment-send-btn:hover { border-color:var(--green); color:var(--green); }
+
+        .empty-state { text-align:center; color:#333; margin-top:4rem; font-family:var(--mono); }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
     </style>
 </head>
 <body>
-    <div class="noise-overlay"></div>
+<div class="noise-overlay"></div>
 
-    <div id="auth-screen">
-        <div class="auth-box">
-            <h1 class="display" style="font-size:1.5rem;margin-bottom:0.5rem;">RESTRICTED ACCESS</h1>
-            <p class="mono" style="font-size:0.8rem;color:#666;">ENTER CREDENTIALS</p>
-            <input type="password" id="adminPass" class="auth-input" placeholder="PASS: admin">
-            <br>
-            <button class="auth-btn" onclick="checkAuth()">Unlock</button>
-            <p id="authError" class="mono" style="color:var(--accent-color);font-size:0.7rem;margin-top:1rem;display:none;">ACCESS DENIED</p>
+<!-- AUTH -->
+<div id="auth-screen">
+    <div class="auth-box">
+        <h1 class="display" style="font-size:1.4rem;margin-bottom:0.3rem;">RESTRICTED ACCESS</h1>
+        <p class="mono" style="font-size:0.72rem;color:#444;margin-bottom:2rem;">AUTHORITY CREDENTIALS REQUIRED</p>
+        <input type="text"     id="adminUser" class="auth-input" placeholder="Username">
+        <input type="password" id="adminPass" class="auth-input" placeholder="Password">
+        <p id="authError" class="mono" style="color:var(--accent);font-size:0.7rem;margin-bottom:0.8rem;display:none;">ACCESS DENIED</p>
+        <button class="auth-btn" onclick="checkAuth()">Unlock</button>
+        <div class="auth-hints">
+            superadmin / super123 &nbsp;|&nbsp; fire_dept / fire123<br>
+            water_dept / water123 &nbsp;|&nbsp; officer1 / field123
         </div>
     </div>
+</div>
 
-    <nav>
-        <div class="mono" style="color:var(--secondary-accent);">● SYSTEM ONLINE</div>
-        <div class="display">ADMIN DASHBOARD</div>
-        <button onclick="logout()" class="mono" style="background:none;border:1px solid #333;color:white;padding:0.3rem 0.8rem;cursor:pointer;">LOGOUT</button>
-    </nav>
+<!-- NAV -->
+<nav>
+    <div class="mono" style="color:var(--green);font-size:0.8rem;">&#9679; SYSTEM ONLINE</div>
+    <div class="display" style="font-size:1rem;">URBANPULSE ADMIN</div>
+    <div style="display:flex;align-items:center;gap:1rem;">
+        <span id="roleTag" class="mono" style="font-size:0.68rem;color:#555;border:1px solid #1a1a1a;padding:0.2rem 0.6rem;border-radius:2px;"></span>
+        <button class="nav-logout" onclick="logout()">LOGOUT</button>
+    </div>
+</nav>
 
-    <div id="dashboardContainer" class="dashboard-container">
-        <aside class="sidebar">
-            <div class="stat-card">
-                <div class="stat-val" style="color:var(--accent-color);" id="totalOpen">00</div>
-                <div class="stat-label">Active Incidents</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-val" style="color:var(--secondary-accent);" id="totalResolved">00</div>
-                <div class="stat-label">Resolved Cases</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-val" style="color:#ff4d00;" id="totalSLA">00</div>
-                <div class="stat-label">SLA Breaches</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-val">100%</div>
-                <div class="stat-label">System Uptime</div>
-            </div>
-        </aside>
+<!-- DASHBOARD -->
+<div class="dashboard-container">
+    <aside class="sidebar">
+        <div class="stat-card">
+            <div class="stat-val" style="color:var(--accent);" id="totalOpen">00</div>
+            <div class="stat-label">Active Incidents</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color:var(--green);" id="totalResolved">00</div>
+            <div class="stat-label">Resolved Cases</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color:#ff4d00;" id="totalSLA">00</div>
+            <div class="stat-label">SLA Breaches</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val">100%</div>
+            <div class="stat-label">System Uptime</div>
+        </div>
+    </aside>
 
-        <main class="feed">
+    <main class="feed">
+        <div class="tab-bar">
+            <button class="feed-tab active" id="tab-btn-incidents" onclick="switchTab('incidents')">Incidents</button>
+            <button class="feed-tab"        id="tab-btn-analytics" onclick="switchTab('analytics')">Analytics</button>
+        </div>
+
+        <!-- INCIDENTS TAB -->
+        <div id="tab-incidents">
             <div id="hotspotMap"></div>
+            <div class="filter-bar">
+                <select id="f-status" class="filter-select" onchange="applyFilters()">
+                    <option value="">All Status</option>
+                    <option>OPEN</option>
+                    <option>UNDER REVIEW</option>
+                    <option>IN PROGRESS</option>
+                    <option>RESOLVED</option>
+                </select>
+                <select id="f-severity" class="filter-select" onchange="applyFilters()">
+                    <option value="">All Severity</option>
+                    <option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+                </select>
+                <select id="f-dept" class="filter-select" onchange="applyFilters()">
+                    <option value="">All Departments</option>
+                    <option>Fire &amp; Rescue</option>
+                    <option>Water Dept</option>
+                    <option>Power &amp; Energy</option>
+                    <option>Public Works</option>
+                    <option>Sanitation Dept</option>
+                    <option>General Services</option>
+                </select>
+                <input id="f-search"    class="filter-input" placeholder="Search / Ref ID..."   oninput="applyFilters()" style="min-width:110px;">
+                <input id="f-area"      class="filter-input" placeholder="Area keyword..."       oninput="applyFilters()" style="min-width:110px;">
+                <input id="f-date-from" type="date" class="filter-select" onchange="applyFilters()" title="From date">
+                <input id="f-date-to"   type="date" class="filter-select" onchange="applyFilters()" title="To date">
+                <button class="filter-clear" onclick="clearFilters()">x Clear</button>
+            </div>
             <div class="feed-header">
-                <span class="mono">INCOMING DATA STREAM</span>
-                <span class="mono" id="lastUpdate">LAST SYNC: —</span>
+                <span class="mono" style="font-size:0.8rem;">INCIDENT STREAM</span>
+                <span class="mono" style="font-size:0.75rem;color:#444;" id="lastUpdate">LAST SYNC: -</span>
             </div>
             <div id="incidentList"></div>
-        </main>
-    </div>
+        </div>
+
+        <!-- ANALYTICS TAB -->
+        <div id="tab-analytics" style="display:none;">
+            <div id="analyticsPanel"></div>
+        </div>
+    </main>
+</div>
 
 <script>
-const API_BASE = "http://127.0.0.1:8000";
-let adminMap = null;
-let adminLayer = null;
-let heatLayer = null;
-let refreshTimer = null;
+var API = 'http://127.0.0.1:8000';
+var adminMap = null, adminLayer = null, heatLayer = null, refreshTimer = null;
+var currentToken = null, currentRole = null, currentDisplay = null;
+var allIncidents = [];
+var internalFlags = {};
+var sseSource = null;
+
+// SSE — connect once after login, receive live pushes
+function connectSSE() {
+    if (sseSource) sseSource.close();
+    sseSource = new EventSource(API + '/stream');
+
+    sseSource.addEventListener('connected', function() {
+        console.log('[SSE] stream connected');
+    });
+
+    // New incident submitted by a citizen
+    sseSource.addEventListener('new_incident', function(e) {
+        var inc = JSON.parse(e.data);
+        showToast('New incident: ' + inc.category + ' — ' + inc.severity, 'accent');
+        loadData();
+    });
+
+    // Status changed by an admin
+    sseSource.addEventListener('status_update', function(e) {
+        var d = JSON.parse(e.data);
+        showToast('Status updated: ' + d.ref_id + ' → ' + d.status, 'green');
+        loadData();
+    });
+
+    // New comment added
+    sseSource.addEventListener('new_comment', function(e) {
+        var d = JSON.parse(e.data);
+        showToast('New comment on ' + d.ref_id, 'blue');
+        loadData();
+    });
+
+    sseSource.onerror = function() {
+        // Silently reconnect after 5s if stream drops
+        setTimeout(connectSSE, 5000);
+    };
+}
+
+function showToast(msg, type) {
+    var colors = {accent:'#ff4d00', green:'#00ff9d', blue:'#00aaff'};
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;'
+        + 'background:#111;border:1px solid ' + (colors[type]||'#444') + ';'
+        + 'color:' + (colors[type]||'#aaa') + ';font-family:var(--mono);font-size:0.72rem;'
+        + 'padding:0.7rem 1.2rem;max-width:320px;box-shadow:0 4px 20px #0008;'
+        + 'animation:fadeIn 0.2s ease;';
+    toast.innerText = '▸ ' + msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.style.opacity='0'; toast.style.transition='opacity 0.4s'; }, 3500);
+    setTimeout(function() { toast.remove(); }, 4000);
+}
 
 // AUTH
-function checkAuth() {
-    const pass = document.getElementById('adminPass').value;
-    if (pass === 'admin') {
+async function checkAuth() {
+    var user = document.getElementById('adminUser').value.trim();
+    var pass = document.getElementById('adminPass').value;
+    try {
+        var res = await fetch(API + '/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: user, password: pass})
+        });
+        if (!res.ok) throw new Error();
+        var data = await res.json();
+        currentToken   = data.token;
+        currentRole    = data.role;
+        currentDisplay = data.display;
+        // Persist login so page re-renders don't wipe auth state
+        sessionStorage.setItem('admin_token',   currentToken);
+        sessionStorage.setItem('admin_role',    currentRole);
+        sessionStorage.setItem('admin_display', currentDisplay);
         document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('roleTag').innerText = currentDisplay + ' - ' + currentRole.replace('_', ' ').toUpperCase();
         loadData();
-        // Auto-refresh every 30 seconds
-        refreshTimer = setInterval(loadData, 30000);
-    } else {
+        connectSSE();
+        refreshTimer = setInterval(loadData, 60000);
+    } catch(e) {
         document.getElementById('authError').style.display = 'block';
     }
 }
-document.getElementById('adminPass').addEventListener('keydown', e => { if (e.key === 'Enter') checkAuth(); });
-function logout() { clearInterval(refreshTimer); location.reload(); }
 
-// LOAD DATA
+document.getElementById('adminUser').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkAuth(); });
+document.getElementById('adminPass').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkAuth(); });
+function logout() {
+    clearInterval(refreshTimer);
+    if(sseSource) sseSource.close();
+    sessionStorage.clear();
+    location.reload();
+}
+
+// Restore session on page load (survives loadData re-renders)
+(function restoreSession() {
+    var t = sessionStorage.getItem('admin_token');
+    var r = sessionStorage.getItem('admin_role');
+    var d = sessionStorage.getItem('admin_display');
+    if (t && r && d) {
+        currentToken   = t;
+        currentRole    = r;
+        currentDisplay = d;
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('roleTag').innerText = d + ' - ' + r.replace('_',' ').toUpperCase();
+        loadData();
+        connectSSE();
+        refreshTimer = setInterval(loadData, 60000);
+    }
+})();
+
+// TABS
+function switchTab(tab) {
+    document.querySelectorAll('.feed-tab').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('tab-btn-' + tab).classList.add('active');
+    document.getElementById('tab-incidents').style.display = tab === 'incidents' ? '' : 'none';
+    document.getElementById('tab-analytics').style.display = tab === 'analytics' ? '' : 'none';
+    if (tab === 'analytics') loadAnalytics();
+}
+
+// LOAD
 async function loadData() {
+    // Always keep auth screen hidden if we have a valid token
+    if (currentToken) {
+        document.getElementById('auth-screen').style.display = 'none';
+    }
     try {
-        const res = await fetch(`${API_BASE}/incidents`);
-        if (!res.ok) throw new Error(`GET /incidents returned ${res.status}`);
-        const incidents = await res.json();
-        renderStats(incidents);
-        renderIncidentList(incidents);
-        renderHotspotMap(incidents);
-        document.getElementById("lastUpdate").innerText = "LAST SYNC: " + new Date().toLocaleTimeString();
-    } catch (err) {
-        console.error("Failed to load:", err);
-        document.getElementById("incidentList").innerHTML = `<div class="empty-state">[ BACKEND ERROR: ${err.message} ]</div>`;
+        var res = await fetch(API + '/incidents');
+        if (!res.ok) throw new Error('GET /incidents returned ' + res.status);
+        allIncidents = await res.json();
+        renderStats(allIncidents);
+        renderIncidentList(allIncidents);
+        renderMap(allIncidents);
+        document.getElementById('lastUpdate').innerText = 'LAST SYNC: ' + new Date().toLocaleTimeString();
+    } catch(err) {
+        document.getElementById('incidentList').innerHTML = '<div class="empty-state">[ BACKEND ERROR: ' + err.message + ' ]</div>';
     }
 }
 
 // STATS
-function renderStats(incidents) {
-    const open = incidents.filter(i => i.status === "OPEN").length;
-    const resolved = incidents.filter(i => i.status === "RESOLVED").length;
-    const breached = incidents.filter(i => i.status === "OPEN" && isSlABreached(i)).length;
-    document.getElementById('totalOpen').innerText = open.toString().padStart(2, '0');
-    document.getElementById('totalResolved').innerText = resolved.toString().padStart(2, '0');
-    document.getElementById('totalSLA').innerText = breached.toString().padStart(2, '0');
+function renderStats(list) {
+    document.getElementById('totalOpen').innerText     = String(list.filter(function(i){return i.status==='OPEN';}).length).padStart(2,'0');
+    document.getElementById('totalResolved').innerText = String(list.filter(function(i){return i.status==='RESOLVED';}).length).padStart(2,'0');
+    document.getElementById('totalSLA').innerText      = String(list.filter(function(i){return i.status==='OPEN' && slaBreached(i);}).length).padStart(2,'0');
 }
 
-// TIME HELPERS
-function timeAgo(isoString) {
-    if (!isoString) return '';
-    const now = new Date();
-    const then = new Date(isoString);
-    const diff = Math.floor((now - then) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-    return `${Math.floor(diff/86400)}d ago`;
+// FILTERS
+function applyFilters() {
+    var status   = document.getElementById('f-status').value;
+    var severity = document.getElementById('f-severity').value;
+    var dept     = document.getElementById('f-dept').value;
+    var search   = document.getElementById('f-search').value.toLowerCase();
+    var area     = document.getElementById('f-area').value.toLowerCase();
+    var dateFrom = document.getElementById('f-date-from').value;
+    var dateTo   = document.getElementById('f-date-to').value;
+    renderIncidentList(allIncidents.filter(function(i) {
+        if (status   && i.status !== status)                                          return false;
+        if (severity && i.severity !== severity)                                      return false;
+        if (dept     && (i.department||'') !== dept)                                  return false;
+        if (search   && i.description.toLowerCase().indexOf(search) === -1
+                     && (i.ref_id||'').toLowerCase().indexOf(search) === -1)          return false;
+        if (area     && i.description.toLowerCase().indexOf(area) === -1)             return false;
+        if (dateFrom && i.created_at && i.created_at.slice(0,10) < dateFrom)         return false;
+        if (dateTo   && i.created_at && i.created_at.slice(0,10) > dateTo)           return false;
+        return true;
+    }));
 }
 
-function isSlABreached(incident) {
-    if (!incident.sla_due) return false;
-    return new Date() > new Date(incident.sla_due);
+function clearFilters() {
+    ['f-status','f-severity','f-dept'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['f-search','f-area','f-date-from','f-date-to'].forEach(function(id){ document.getElementById(id).value=''; });
+    renderIncidentList(allIncidents);
 }
 
-function slaCountdown(incident) {
-    if (!incident.sla_due) return null;
-    const now = new Date();
-    const due = new Date(incident.sla_due);
-    const diff = Math.floor((due - now) / 1000);
-
-    if (diff <= 0) return { label: '⚠ SLA BREACHED', cls: 'breached' };
-
-    const h = Math.floor(diff / 3600);
-    const m = Math.floor((diff % 3600) / 60);
-
-    if (h < 2) return { label: `⏱ ${h}h ${m}m remaining`, cls: 'warning' };
-    return { label: `✓ SLA: ${h}h ${m}m left`, cls: 'ok' };
+// HELPERS
+function timeAgo(iso) {
+    if (!iso) return '';
+    var diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)    return diff + 's ago';
+    if (diff < 3600)  return Math.floor(diff/60)   + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600)  + 'h ago';
+    return Math.floor(diff/86400) + 'd ago';
 }
 
-// TYPE METADATA
-function getTypeMeta(category) {
-    const t = (category || '').toLowerCase();
-    if (t.indexOf('water') !== -1 || t.indexOf('sanitation') !== -1)
-        return { icon: 'water_drop', color: '#00aaff', label: 'Water / Sanitation' };
-    if (t.indexOf('power') !== -1 || t.indexOf('outage') !== -1)
-        return { icon: 'bolt', color: '#ffd100', label: 'Power Outage' };
-    if (t.indexOf('traffic') !== -1)
-        return { icon: 'traffic', color: '#ff4d00', label: 'Traffic Obstruction' };
-    if (t.indexOf('infrastructure') !== -1)
-        return { icon: 'business', color: '#9b59b6', label: 'Infrastructure Damage' };
-    return { icon: 'report_problem', color: '#888', label: category || 'Unknown' };
+function slaBreached(i) { return i.sla_due && new Date() > new Date(i.sla_due); }
+
+function slaLabel(i) {
+    if (!i.sla_due) return null;
+    var diff = Math.floor((new Date(i.sla_due).getTime() - Date.now()) / 1000);
+    if (diff <= 0) return {text:'! SLA BREACHED', cls:'breached'};
+    var h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60);
+    if (h < 2) return {text: h+'h '+m+'m remaining', cls:'warning'};
+    return {text:'SLA: '+h+'h '+m+'m left', cls:'ok'};
+}
+
+function typeMeta(cat) {
+    var t = (cat||'').toLowerCase();
+    if (t.indexOf('water')!=-1||t.indexOf('sanitation')!=-1) return {icon:'water_drop',color:'#00aaff',label:'Water/Sanitation'};
+    if (t.indexOf('power')!=-1||t.indexOf('outage')!=-1)     return {icon:'bolt',      color:'#ffd100',label:'Power Outage'};
+    if (t.indexOf('traffic')!=-1)                             return {icon:'traffic',   color:'#ff4d00',label:'Traffic'};
+    if (t.indexOf('infrastructure')!=-1)                      return {icon:'business',  color:'#9b59b6',label:'Infrastructure'};
+    return {icon:'report_problem',color:'#888',label:cat||'Unknown'};
 }
 
 // INCIDENT LIST
-function renderIncidentList(incidents) {
-    const container = document.getElementById("incidentList");
-    container.innerHTML = "";
-    if (!incidents || incidents.length === 0) {
+function renderIncidentList(list) {
+    var container = document.getElementById('incidentList');
+    if (!list || list.length === 0) {
         container.innerHTML = '<div class="empty-state">[ NO INCIDENTS FOUND ]</div>';
         return;
     }
-    incidents.forEach((incident) => {
-        const isResolved = incident.status === "RESOLVED";
-        const incId = incident.id;
-        const meta = getTypeMeta(incident.category);
-        const severityColor = incident.severity === 'HIGH' ? '#ff4d00' : incident.severity === 'MEDIUM' ? '#ffcc00' : '#00bfff';
-        const sla = !isResolved ? slaCountdown(incident) : null;
-        const breached = !isResolved && isSlABreached(incident);
+    container.innerHTML = '';
+    list.forEach(function(inc) {
+        var resolved   = inc.status === 'RESOLVED';
+        var meta       = typeMeta(inc.category);
+        var sevColor   = inc.severity==='HIGH' ? '#ff4d00' : inc.severity==='MEDIUM' ? '#ffcc00' : '#00bfff';
+        var sla        = !resolved ? slaLabel(inc) : null;
+        var breached   = !resolved && slaBreached(inc);
+        var canComment = currentRole && ['super_admin','dept_admin','field_officer'].indexOf(currentRole) !== -1;
+        var comments   = inc.comments || [];
 
-        const card = document.createElement('div');
+        var commentsHtml = comments.map(function(c) {
+            var cls  = c.role==='citizen' ? 'citizen' : (c.internal ? 'internal' : 'authority');
+            var lock = c.internal ? '[Internal] ' : '';
+            return '<div class="comment-bubble '+cls+'">'
+                 + '<div class="c-author">'+c.author+' - '+lock+new Date(c.time).toLocaleTimeString()+'</div>'
+                 + c.message+'</div>';
+        }).join('');
+
+        var commentInput = canComment
+            ? '<div class="comment-row">'
+            + '<button type="button" class="comment-toggle" id="tog-'+inc.id+'" onclick="toggleInternal(\''+inc.id+'\')">Public</button>'
+            + '<input class="comment-text-input" id="cin-'+inc.id+'" placeholder="Reply or internal note...">'
+            + '<button type="button" class="comment-send-btn" onclick="sendComment(\''+inc.id+'\')">SEND</button>'
+            + '</div>' : '';
+
+        var stColor = inc.status==='RESOLVED'?'#00ff9d':inc.status==='IN PROGRESS'?'#00aaff':inc.status==='UNDER REVIEW'?'#ffcc00':'#ff4d00';
+        var card = document.createElement('div');
         card.className = 'incident-card' + (breached ? ' sla-breached' : '');
-        card.style.opacity = isResolved ? '0.45' : '1';
-
-        card.innerHTML = `
-            <div class="status-indicator ${isResolved ? 'resolved' : ''}"></div>
-            <div>
-                <div class="mono" style="font-size:0.85rem;color:#aaa;line-height:1.9;">
-                    <span class="material-icons" style="color:${meta.color};font-size:14px;vertical-align:middle;">${meta.icon}</span>
-                    <b style="color:${meta.color}">${incident.category}</b>
-                    &nbsp;•&nbsp;<span style="color:${severityColor};font-weight:bold;">${incident.severity}</span>
-                    &nbsp;•&nbsp;<span style="color:${isResolved ? 'var(--secondary-accent)' : 'var(--accent-color)'};">${incident.status}</span><br>
-                    ${incident.description}<br>
-                    <span style="color:#555;font-size:0.72rem;">📍 ${incident.latitude}, ${incident.longitude}</span><br>
-                    ${incident.department ? `<span class="dept-badge">🏢 ${incident.department}</span>` : ''}
-                    ${incident.ref_id ? `<span class="dept-badge" style="margin-left:4px;color:#666;">REF: ${incident.ref_id}</span>` : ''}
-                    ${incident.created_at ? `<span class="time-ago" style="margin-left:6px;">🕐 ${timeAgo(incident.created_at)}</span>` : ''}
-                    ${sla ? `<br><span class="sla-badge ${sla.cls}">${sla.label}</span>` : ''}
-                    ${isResolved && incident.resolved_at ? `<br><span class="time-ago">✓ Resolved ${timeAgo(incident.resolved_at)}</span>` : ''}
-                    ${incident.image ? `<br><img src="${incident.image}" style="margin-top:8px;max-width:180px;max-height:120px;object-fit:cover;border:1px solid #333;border-radius:4px;" onclick="this.style.maxWidth=this.style.maxWidth==='100%'?'180px':'100%'" title="Click to expand">` : ''}
-                </div>
-            </div>
-            <div class="incident-actions">
-                ${!isResolved
-                    ? `<button onclick="resolveIncident('${incId}')">MARK RESOLVED</button>`
-                    : `<button onclick="reopenIncident('${incId}')">REOPEN</button>`
-                }
-            </div>
-        `;
+        card.style.opacity = resolved ? '0.45' : '1';
+        card.innerHTML = ''
+            +'<div class="status-dot'+(resolved?' resolved':'')+'"></div>'
+            +'<div>'
+            +'<div class="mono" style="font-size:0.82rem;color:#aaa;line-height:2;">'
+            +'<span class="material-icons" style="color:'+meta.color+';font-size:13px;vertical-align:middle;">'+meta.icon+'</span> '
+            +'<b style="color:'+meta.color+'">'+inc.category+'</b>'
+            +' &nbsp;|&nbsp; <span style="color:'+sevColor+';font-weight:700">'+inc.severity+'</span>'
+            +' &nbsp;|&nbsp; <span style="color:'+stColor+';font-weight:600">'+inc.status+'</span><br>'
+            +inc.description+'<br>'
+            +'<span style="color:#444;font-size:0.7rem;">'+inc.latitude+', '+inc.longitude+'</span><br>'
+            +(inc.department ? '<span class="dept-badge">'+inc.department+'</span> ' : '')
+            +(inc.ref_id     ? '<span class="dept-badge">'+inc.ref_id+'</span> '     : '')
+            +(inc.created_at ? '<span class="time-ago">'+timeAgo(inc.created_at)+'</span>' : '')
+            +(sla ? '<br><span class="sla-badge '+sla.cls+'">'+sla.text+'</span>' : '')
+            +(resolved && inc.resolved_at ? '<br><span class="time-ago">Resolved '+timeAgo(inc.resolved_at)+(inc.resolved_by?' by '+inc.resolved_by:'')+'</span>' : '')
+            +(inc.image ? '<br><img src="'+inc.image+'" style="margin-top:6px;max-width:160px;max-height:100px;object-fit:cover;border:1px solid #2a2a2a;cursor:pointer;" onclick="this.style.maxWidth=this.style.maxWidth===\'100%\'?\'160px\':\'100%\'">' : '')
+            +'</div>'
+            +'<div class="comment-thread">'+commentsHtml+commentInput+'</div>'
+            +'</div>'
+            +'<div class="incident-actions">'
+            +'<select class="status-select" data-incid="'+inc.id+'" style="background:#1a1a1a;border:1px solid #333;color:'+stColor+';font-family:var(--mono);font-size:0.68rem;padding:0.4rem 0.5rem;width:100%;cursor:pointer;margin-bottom:0.4rem;">'
+            +'<option value="OPEN"'+(inc.status==='OPEN'?' selected':'')+'>OPEN</option>'
+            +'<option value="UNDER REVIEW"'+(inc.status==='UNDER REVIEW'?' selected':'')+'>UNDER REVIEW</option>'
+            +'<option value="IN PROGRESS"'+(inc.status==='IN PROGRESS'?' selected':'')+'>IN PROGRESS</option>'
+            +'<option value="RESOLVED"'+(inc.status==='RESOLVED'?' selected':'')+'>RESOLVED</option>'
+            +'</select>'
+            +'</div>';
         container.appendChild(card);
     });
+
+    // Event delegation on the list container — fires only on real user interaction
+    container.addEventListener('change', function(e) {
+        if (e.target && e.target.classList.contains('status-select')) {
+            var incId = e.target.getAttribute('data-incid');
+            var val   = e.target.value;
+            if (incId && val) updateStatus(incId, val);
+        }
+    });
 }
 
-// UPDATE STATUS
-async function updateIncidentStatus(incidentId, newStatus) {
+// COMMENTS
+function toggleInternal(id) {
+    internalFlags[id] = !internalFlags[id];
+    var btn = document.getElementById('tog-'+id);
+    if (internalFlags[id]) { btn.innerText='Internal'; btn.classList.add('internal'); }
+    else                   { btn.innerText='Public';   btn.classList.remove('internal'); }
+}
+
+async function sendComment(incId) {
+    var input = document.getElementById('cin-'+incId);
+    var msg   = input.value.trim();
+    if (!msg) return;
     try {
-        const res = await fetch(`${API_BASE}/update`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: incidentId, status: newStatus })
+        await fetch(API+'/comment', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({incident_id:incId, token:currentToken||'', message:msg})
         });
-        if (!res.ok) {
-            const errText = await res.text();
-            alert("Update failed: " + res.status + "\n" + errText);
-            return;
-        }
+        input.value = '';
         loadData();
-    } catch (err) {
-        alert("Network error: " + err.message);
+    } catch(e) {}
+}
+
+// STATUS UPDATE
+async function updateStatus(id, newStatus) {
+    try {
+        var res = await fetch(API+'/update', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id:id, status:newStatus, token:currentToken||''})
+        });
+        if (!res.ok) { alert('Update failed: '+res.status); return; }
+        loadData();
+    } catch(err) { alert('Network error: '+err.message); }
+}
+
+// ANALYTICS
+async function loadAnalytics() {
+    var panel = document.getElementById('analyticsPanel');
+    if (!currentToken) {
+        panel.innerHTML = '<div class="empty-state" style="margin-top:2rem;">Login required to view analytics.</div>';
+        return;
+    }
+    panel.innerHTML = '<div class="empty-state">Loading...</div>';
+    try {
+        var res = await fetch(API+'/analytics?token='+currentToken);
+        if (!res.ok) throw new Error();
+        var d = await res.json();
+        var depts = Object.entries(d.by_department);
+        var maxD  = Math.max.apply(null, depts.map(function(e){return e[1];}).concat([1]));
+        panel.innerHTML = ''
+            +'<div class="analytics-grid">'
+            +aCard('Total Incidents', d.total, 'white')
+            +aCard('Resolution Rate', d.resolution_rate+'%', 'var(--green)')
+            +aCard('Avg Resolution',  d.avg_resolution_hrs+'h', '#00aaff')
+            +aCard('SLA Breaches',    d.sla_breaches, 'var(--accent)')
+            +'</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;">'
+            +'<div class="analytics-card"><div class="analytics-title">By Severity</div>'
+            +bRow('HIGH',   d.by_severity.HIGH,   d.total,'#ff4d00')
+            +bRow('MEDIUM', d.by_severity.MEDIUM, d.total,'#ffcc00')
+            +bRow('LOW',    d.by_severity.LOW,    d.total,'#00bfff')
+            +'</div>'
+            +'<div class="analytics-card"><div class="analytics-title">By Status</div>'
+            +bRow('OPEN',         d.by_status['OPEN']||0,          d.total,'#ff4d00')
+            +bRow('UNDER REVIEW', d.by_status['UNDER REVIEW']||0,  d.total,'#ffcc00')
+            +bRow('IN PROGRESS',  d.by_status['IN PROGRESS']||0,   d.total,'#00aaff')
+            +bRow('RESOLVED',     d.by_status['RESOLVED']||0,      d.total,'#00ff9d')
+            +'</div>'
+            +'<div class="analytics-card" style="grid-column:1/-1"><div class="analytics-title">By Department</div>'
+            +depts.map(function(e){return bRow(e[0],e[1],maxD,'#9b59b6');}).join('')
+            +'</div>'
+            +'</div>';
+    } catch(e) {
+        panel.innerHTML = '<div class="empty-state">[ ANALYTICS UNAVAILABLE ]</div>';
     }
 }
-function resolveIncident(id) { updateIncidentStatus(id, "RESOLVED"); }
-function reopenIncident(id)  { updateIncidentStatus(id, "OPEN"); }
 
-// MAP ICON
-function makeIcon(meta, severity) {
-    const ring = severity === 'HIGH' ? '#ff4d00' : severity === 'MEDIUM' ? '#ffcc00' : '#00bfff';
-    return L.divIcon({
-        className: '',
-        html: `<div style="width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.85);border:2.5px solid ${ring};display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px ${ring}99;font-family:'Material Icons';font-size:18px;color:${meta.color};">${meta.icon}</div>`,
-        iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -22]
-    });
+function aCard(title, val, color) {
+    return '<div class="analytics-card"><div class="analytics-title">'+title+'</div>'
+          +'<div class="analytics-val" style="color:'+color+'">'+val+'</div></div>';
+}
+
+function bRow(label, val, max, color) {
+    var pct = max > 0 ? Math.round(val/max*100) : 0;
+    return '<div class="bar-row">'
+          +'<span class="bar-label">'+label+'</span>'
+          +'<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>'
+          +'<span class="bar-count">'+val+'</span></div>';
 }
 
 // MAP
-function renderHotspotMap(incidents) {
+function makeIcon(meta, severity) {
+    var ring = severity==='HIGH'?'#ff4d00':severity==='MEDIUM'?'#ffcc00':'#00bfff';
+    return L.divIcon({
+        className:'',
+        html:'<div style="width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,0.85);border:2px solid '+ring+';display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px '+ring+'88;font-family:\'Material Icons\';font-size:16px;color:'+meta.color+';">'+meta.icon+'</div>',
+        iconSize:[34,34], iconAnchor:[17,17], popupAnchor:[0,-20]
+    });
+}
+
+function renderMap(list) {
     if (!window.L) return;
-    const container = document.getElementById('hotspotMap');
+    var container = document.getElementById('hotspotMap');
     if (!adminMap) {
         adminMap = L.map(container).setView([20.5937, 78.9629], 5);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
-        }).addTo(adminMap);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(adminMap);
         adminLayer = L.layerGroup().addTo(adminMap);
     }
     adminLayer.clearLayers();
     if (heatLayer) { adminMap.removeLayer(heatLayer); heatLayer = null; }
 
-    const points = [], heatPoints = [];
-    const wt = { "HIGH": 1.0, "MEDIUM": 0.6, "LOW": 0.3 };
-
-    incidents.filter(i => i.status === "OPEN").forEach(i => {
-        const lat = parseFloat(i.latitude), lng = parseFloat(i.longitude);
-        if (isNaN(lat) || isNaN(lng)) return;
-        points.push([lat, lng]);
-        heatPoints.push([lat, lng, wt[i.severity] || 0.5]);
-        const meta = getTypeMeta(i.category);
-        const sc = i.severity === 'HIGH' ? '#ff4d00' : i.severity === 'MEDIUM' ? '#ffcc00' : '#00bfff';
-        const marker = L.marker([lat, lng], { icon: makeIcon(meta, i.severity) });
-        marker.bindPopup(`
-            <div style="font-family:monospace;font-size:0.82rem;line-height:1.8;min-width:200px;">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-                    <span class="material-icons" style="color:${meta.color};font-size:16px;">${meta.icon}</span>
-                    <b style="color:${meta.color}">${meta.label}</b>
-                </div>
-                <div>${i.description}</div>
-                <div>Severity: <b style="color:${sc}">${i.severity}</b></div>
-                ${i.department ? `<div>Dept: <b>${i.department}</b></div>` : ''}
-                ${i.created_at ? `<div style="color:#888;">Reported: ${timeAgo(i.created_at)}</div>` : ''}
-                <div style="color:#888;font-size:0.75rem;">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-            </div>
-        `);
+    var points = [], heat = [], wt = {HIGH:1.0,MEDIUM:0.6,LOW:0.3};
+    list.filter(function(i){return i.status==='OPEN';}).forEach(function(i) {
+        var lat = parseFloat(i.latitude), lng = parseFloat(i.longitude);
+        if (isNaN(lat)||isNaN(lng)) return;
+        points.push([lat,lng]);
+        heat.push([lat,lng,wt[i.severity]||0.5]);
+        var meta   = typeMeta(i.category);
+        var sc     = i.severity==='HIGH'?'#ff4d00':i.severity==='MEDIUM'?'#ffcc00':'#00bfff';
+        var marker = L.marker([lat,lng],{icon:makeIcon(meta,i.severity)});
+        marker.bindPopup('<div style="font-family:monospace;font-size:0.8rem;line-height:1.8;min-width:180px;">'
+            +'<b style="color:'+meta.color+'">'+meta.label+'</b><br>'
+            +i.description+'<br>'
+            +'Severity: <b style="color:'+sc+'">'+i.severity+'</b>'
+            +(i.department ? '<br>Dept: '+i.department : '')
+            +'</div>');
         adminLayer.addLayer(marker);
     });
-
-    if (heatPoints.length && window.L.heatLayer) {
-        heatLayer = L.heatLayer(heatPoints, {
-            radius: 50, blur: 35, maxZoom: 17, max: 1.0,
-            gradient: { 0.0: 'green', 0.5: 'yellow', 0.8: 'orange', 1.0: 'red' }
+    if (heat.length && window.L.heatLayer) {
+        heatLayer = L.heatLayer(heat,{radius:45,blur:30,maxZoom:17,max:1.0,
+            gradient:{0:'green',0.5:'yellow',0.8:'orange',1:'red'}
         }).addTo(adminMap);
     }
     if (points.length) adminMap.fitBounds(L.latLngBounds(points).pad(0.4));
-    renderMapLegend();
-    setTimeout(() => adminMap.invalidateSize(), 150);
-}
-
-function renderMapLegend() {
-    if (document.getElementById('mapLegend')) return;
-    const legend = document.createElement('div');
-    legend.id = 'mapLegend';
-    legend.style.cssText = 'position:absolute;bottom:10px;left:10px;z-index:1000;background:rgba(0,0,0,0.82);border:1px solid #333;padding:0.6rem 0.9rem;font-family:monospace;font-size:0.7rem;color:#ccc;pointer-events:none;line-height:2;';
-    legend.innerHTML = `
-        <div style="color:#aaa;margin-bottom:2px;letter-spacing:1px;font-size:0.65rem;">INCIDENT TYPES</div>
-        <div><span class="material-icons" style="font-size:11px;color:#9b59b6;vertical-align:middle;">business</span> Infrastructure</div>
-        <div><span class="material-icons" style="font-size:11px;color:#00aaff;vertical-align:middle;">water_drop</span> Water / Sanitation</div>
-        <div><span class="material-icons" style="font-size:11px;color:#ffd100;vertical-align:middle;">bolt</span> Power Outage</div>
-        <div><span class="material-icons" style="font-size:11px;color:#ff4d00;vertical-align:middle;">traffic</span> Traffic</div>
-        <div style="margin-top:4px;border-top:1px solid #333;padding-top:4px;color:#aaa;font-size:0.65rem;">SEVERITY RING</div>
-        <div><span style="color:#ff4d00;">⬤</span> HIGH &nbsp;<span style="color:#ffcc00;">⬤</span> MED &nbsp;<span style="color:#00bfff;">⬤</span> LOW</div>
-    `;
-    document.getElementById('hotspotMap').appendChild(legend);
+    setTimeout(function(){adminMap.invalidateSize();},150);
 }
 </script>
-
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 </body>
 </html>

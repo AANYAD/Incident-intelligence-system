@@ -237,6 +237,68 @@
             padding: 0.2rem 0.6rem; border-radius: 3px; margin-top: 4px;
         }
 
+        /* AUTH OVERLAY */
+        .auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 3000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-overlay.hidden { display: none !important; }
+        .auth-card {
+            border: 1px solid var(--border-color); background: var(--surface-color);
+            padding: 3rem; width: 90%; max-width: 420px;
+        }
+        .auth-tabs { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 1px solid #333; }
+        .auth-tab {
+            background: none; border: none; color: #555; font-family: var(--font-mono);
+            font-size: 0.85rem; text-transform: uppercase; padding: 0.6rem 1.5rem;
+            cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+        }
+        .auth-tab.active { color: white; border-bottom-color: var(--accent-color); }
+        .auth-input {
+            width: 100%; background: transparent; border: none;
+            border-bottom: 1px solid #444; color: white; padding: 0.8rem 0;
+            font-family: var(--font-mono); font-size: 1rem; outline: none;
+            margin-bottom: 1.5rem; transition: border-color 0.2s;
+        }
+        .auth-input:focus { border-bottom-color: var(--accent-color); }
+        .auth-submit {
+            width: 100%; background: white; color: black; border: none;
+            padding: 1rem; font-family: var(--font-display); font-size: 1rem;
+            text-transform: uppercase; cursor: pointer; margin-top: 0.5rem;
+        }
+        .auth-error { color: var(--accent-color); font-family: var(--font-mono); font-size: 0.75rem; margin-top: 0.5rem; min-height: 1.2em; }
+        .auth-skip { background: none; border: none; color: #444; font-family: var(--font-mono); font-size: 0.7rem; margin-top: 1rem; cursor: pointer; width: 100%; text-align: center; }
+        .auth-skip:hover { color: #888; }
+
+        /* NAV USER BADGE */
+        .nav-user { font-family: var(--font-mono); font-size: 0.75rem; display: flex; align-items: center; gap: 0.8rem; }
+        .nav-role { padding: 0.2rem 0.6rem; border: 1px solid #333; border-radius: 3px; color: #888; }
+        .nav-logout { background: none; border: 1px solid #333; color: #666; font-family: var(--font-mono); font-size: 0.7rem; padding: 0.3rem 0.7rem; cursor: pointer; }
+        .nav-logout:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
+        /* COMMENT THREAD */
+        .comment-section { margin-top: 1rem; border-top: 1px solid #1e1e1e; padding-top: 0.8rem; }
+        .comment-bubble {
+            padding: 0.5rem 0.8rem; margin-bottom: 0.5rem; border-radius: 4px;
+            font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.6;
+        }
+        .comment-bubble.citizen { background: #1a1a2e; border-left: 2px solid #444; }
+        .comment-bubble.authority { background: #0d2218; border-left: 2px solid var(--secondary-accent); }
+        .comment-bubble.internal { background: #1a1200; border-left: 2px solid #ffcc00; }
+        .comment-author { font-size: 0.65rem; color: #555; margin-bottom: 2px; }
+        .comment-input-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .comment-input {
+            flex: 1; background: transparent; border: 1px solid #2a2a2a; color: white;
+            font-family: var(--font-mono); font-size: 0.75rem; padding: 0.4rem 0.6rem; outline: none;
+        }
+        .comment-input:focus { border-color: #555; }
+        .comment-send {
+            background: transparent; border: 1px solid #333; color: #888;
+            font-family: var(--font-mono); font-size: 0.7rem; padding: 0.4rem 0.8rem; cursor: pointer;
+        }
+        .comment-send:hover { border-color: var(--secondary-accent); color: var(--secondary-accent); }
+
         @media (max-width: 768px) {
             .hero-title { font-size: 16vw; }
             .report-grid { grid-template-columns: 1fr; gap: 2rem; }
@@ -248,11 +310,40 @@
     </style>
 </head>
 <body>
+    <!-- AUTH OVERLAY -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <h2 class="display" style="font-size:1.4rem;margin-bottom:0.3rem;">URBANPULSE</h2>
+            <p class="mono" style="color:#555;font-size:0.75rem;margin-bottom:1.5rem;">SECURE CITIZEN PORTAL</p>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+                <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+            <!-- LOGIN FORM -->
+            <div id="loginForm">
+                <input class="auth-input" id="loginUser" placeholder="Username" autocomplete="username">
+                <input class="auth-input" id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+                <div class="auth-error" id="loginError"></div>
+                <button class="auth-submit" onclick="doLogin()">Login →</button>
+            </div>
+            <!-- SIGNUP FORM -->
+            <div id="signupForm" style="display:none;">
+                <input class="auth-input" id="signupUser"    placeholder="Username">
+                <input class="auth-input" id="signupEmail"   type="email" placeholder="Email (for alerts)">
+                <input class="auth-input" id="signupPass"    type="password" placeholder="Password">
+                <input class="auth-input" id="signupConfirm" type="password" placeholder="Confirm Password">
+                <div class="auth-error" id="signupError"></div>
+                <button class="auth-submit" onclick="doSignup()">Create Account →</button>
+            </div>
+            <button class="auth-skip" onclick="skipAuth()">Continue as guest (tracking disabled)</button>
+        </div>
+    </div>
+
     <div class="noise-overlay"></div>
 
     <nav>
         <div class="logo-text">UrbanPulse_Lite</div>
-        <div class="nav-status">
+        <div id="navRight" class="nav-status">
             <div class="status-dot"></div>
             <span class="mono">SYSTEM ONLINE</span>
         </div>
@@ -278,7 +369,8 @@
         
         <div class="tab-nav">
             <button class="tab-btn active" onclick="setTab('citizen')">Report Incident</button>
-            <button class="tab-btn" onclick="window.location.href='admin.html'">Admin Dashboard</button>
+            <button class="tab-btn" onclick="window.location.href='heatmap.html'">Live Heatmap</button>
+            <button class="tab-btn" onclick="window.location.href='admin.html'">Admin</button>
         </div>
 
         <div id="citizen-view" class="view-section active">
@@ -341,11 +433,25 @@
 
                     <div class="input-group">
                         <label>Geolocation Data</label>
-                        <div class="location-wrapper">
-                            <input type="text" class="brutal-input" id="locationInput" placeholder="--.--, --.--" readonly>
-                            <button type="button" class="btn-locate" onclick="getLocation()">
-                                [ O ] ACQUIRE
-                            </button>
+                        <!-- Mode toggle -->
+                        <div style="display:flex;gap:0;margin-bottom:0.6rem;">
+                            <button type="button" id="btnLive"   onclick="setLocMode('live')"   style="flex:1;background:white;color:black;border:1px solid #333;font-family:var(--mono);font-size:0.7rem;padding:0.35rem 0;cursor:pointer;transition:0.2s;">[ LIVE GPS ]</button>
+                            <button type="button" id="btnManual" onclick="setLocMode('manual')" style="flex:1;background:transparent;color:#555;border:1px solid #333;border-left:none;font-family:var(--mono);font-size:0.7rem;padding:0.35rem 0;cursor:pointer;transition:0.2s;">[ MANUAL ]</button>
+                        </div>
+                        <!-- Live GPS panel -->
+                        <div id="liveLocPanel">
+                            <div class="location-wrapper">
+                                <input type="text" class="brutal-input" id="locationInput" placeholder="--.--, --.--" readonly>
+                                <button type="button" class="btn-locate" onclick="getLocation()">[ O ] ACQUIRE</button>
+                            </div>
+                        </div>
+                        <!-- Manual entry panel -->
+                        <div id="manualLocPanel" style="display:none;">
+                            <div style="display:flex;gap:0.5rem;">
+                                <input type="number" class="brutal-input" id="manualLat" placeholder="Latitude  e.g. 28.5691" step="any" style="flex:1;">
+                                <input type="number" class="brutal-input" id="manualLng" placeholder="Longitude e.g. 77.2100" step="any" style="flex:1;">
+                            </div>
+                            <button type="button" onclick="confirmManual()" style="margin-top:0.4rem;width:100%;background:transparent;border:1px solid #333;color:#aaa;font-family:var(--mono);font-size:0.7rem;padding:0.35rem;cursor:pointer;">CONFIRM COORDINATES</button>
                         </div>
                         <div class="location-status" id="locStatus">WAITING FOR SATELLITE...</div>
                         <div id="mapContainer" class="map-container hidden">
@@ -423,10 +529,57 @@
             }
         }
 
+        // LOCATION MODE TOGGLE
+        var locMode = 'live';
+        function setLocMode(mode) {
+            locMode = mode;
+            document.getElementById('liveLocPanel').style.display   = mode === 'live'   ? '' : 'none';
+            document.getElementById('manualLocPanel').style.display = mode === 'manual' ? '' : 'none';
+            document.getElementById('btnLive').style.background   = mode === 'live'   ? 'white'       : 'transparent';
+            document.getElementById('btnLive').style.color        = mode === 'live'   ? 'black'       : '#555';
+            document.getElementById('btnManual').style.background = mode === 'manual' ? 'white'       : 'transparent';
+            document.getElementById('btnManual').style.color      = mode === 'manual' ? 'black'       : '#555';
+            const status = document.getElementById('locStatus');
+            if (mode === 'manual') {
+                status.innerText = "ENTER COORDINATES MANUALLY";
+                status.style.color = "#666";
+            } else {
+                status.innerText = "WAITING FOR SATELLITE...";
+                status.style.color = "#666";
+            }
+        }
+
+        function confirmManual() {
+            const lat = parseFloat(document.getElementById('manualLat').value);
+            const lng = parseFloat(document.getElementById('manualLng').value);
+            const status = document.getElementById('locStatus');
+            if (isNaN(lat) || isNaN(lng)) {
+                status.innerText = "INVALID COORDINATES";
+                status.style.color = "var(--accent)";
+                return;
+            }
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                status.innerText = "OUT OF RANGE (lat -90..90, lng -180..180)";
+                status.style.color = "var(--accent)";
+                return;
+            }
+            // Store in locationInput so report.js can pick it up
+            let hidden = document.getElementById('locationInput');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.id   = 'locationInput';
+                document.body.appendChild(hidden);
+            }
+            hidden.value = lat.toFixed(6) + ', ' + lng.toFixed(6);
+            status.innerText = "COORDINATES SET: " + lat.toFixed(4) + ", " + lng.toFixed(4);
+            status.style.color = "var(--secondary-accent)";
+        }
+
         // GEOLOCATION
         function getLocation() {
             const status = document.getElementById('locStatus');
-            const input = document.getElementById('locationInput');
+            const input  = document.getElementById('locationInput');
             status.innerText = "TRIANGULATING SIGNAL...";
             status.classList.add('scanning');
             input.placeholder = "SEARCHING...";
@@ -440,11 +593,11 @@
 
         function showPosition(position) {
             const status = document.getElementById('locStatus');
-            const input = document.getElementById('locationInput');
+            const input  = document.getElementById('locationInput');
             setTimeout(() => {
-                const lat = position.coords.latitude.toFixed(6);
+                const lat  = position.coords.latitude.toFixed(6);
                 const long = position.coords.longitude.toFixed(6);
-                input.value = `${lat}, ${long}`;
+                input.value  = `${lat}, ${long}`;
                 status.innerText = "SIGNAL LOCKED";
                 status.classList.remove('scanning');
                 status.style.color = "var(--secondary-accent)";
@@ -454,9 +607,9 @@
 
         function showError() {
             const status = document.getElementById('locStatus');
-            status.innerText = "SIGNAL LOST";
+            status.innerText = "SIGNAL LOST — try Manual mode";
             status.classList.remove('scanning');
-            showDialog("CONNECTION FAILED", "Unable to retrieve location.", "error");
+            status.style.color = "var(--accent)";
         }
 
         // TYPE PREVIEW
@@ -519,6 +672,14 @@
                 const data = await res.json();
                 const statusColor = data.status === "RESOLVED" ? "#00ff9d" : "#ff4d00";
                 const sevColor = data.severity === "HIGH" ? "#ff4d00" : data.severity === "MEDIUM" ? "#ffcc00" : "#00bfff";
+                const comments = (data.comments || []).map(c => `
+                    <div class="comment-bubble ${c.role === 'citizen' ? 'citizen' : 'authority'}">
+                        <div class="comment-author">${c.author} · ${new Date(c.time).toLocaleTimeString()}</div>
+                        ${c.message}
+                    </div>
+                `).join('') || '<div class="mono" style="color:#444;font-size:0.7rem;">No updates yet.</div>';
+
+                const token = localStorage.getItem('up_token') || '';
                 el.innerHTML = `
                     <div style="margin-top:6px;padding:8px 10px;background:#181818;border:1px solid #2a2a2a;border-radius:4px;">
                         <div class="mono" style="font-size:0.72rem;line-height:1.9;color:#aaa;">
@@ -527,15 +688,200 @@
                             Dept: <b style="color:#e0e0e0;">${data.department}</b><br>
                             ${data.resolved_at ? `<span style="color:#00ff9d;">✓ Resolved</span>` : `<span style="color:#555;">Pending resolution</span>`}
                         </div>
+                        <div class="comment-section">
+                            <div class="mono" style="font-size:0.65rem;color:#555;margin-bottom:6px;">UPDATES</div>
+                            <div id="comments-${refId}">${comments}</div>
+                            ${token ? `
+                            <div class="comment-input-row">
+                                <input class="comment-input" id="cinput-${refId}" placeholder="Add a comment...">
+                                <button class="comment-send" onclick="sendComment('${refId}', '${data.id || ''}')">SEND</button>
+                            </div>` : ''}
+                        </div>
                     </div>
                 `;
+                // store incident id mapping
+                window._refToId = window._refToId || {};
+                window._refToId[refId] = data.id;
             } catch (err) {
                 el.innerHTML = '<span class="mono" style="font-size:0.7rem;color:#ff4d00;">Could not fetch — is server running?</span>';
             }
         };
+
+        window.sendComment = async function(refId, incidentId) {
+            const input = document.getElementById(`cinput-${refId}`);
+            const msg = input.value.trim();
+            if (!msg) return;
+            const token = localStorage.getItem('up_token') || 'guest';
+            try {
+                await fetch('http://127.0.0.1:8000/comment', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ incident_id: incidentId, token, message: msg })
+                });
+                input.value = '';
+                checkStatus(refId);
+            } catch(e) {}
+        };
     </script>
 
-    <script type="module" src="js/report.js"></script>
+    <script>
+    const API = 'http://127.0.0.1:8000';
 
+    // ── AUTH STATE ──────────────────────────────────────────────────
+    let currentUser = null;
+    let citizenSSE  = null;
+
+    function switchAuthTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('loginForm').style.display  = tab === 'login'  ? '' : 'none';
+        document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
+    }
+
+    async function doLogin() {
+        const user = document.getElementById('loginUser').value.trim();
+        const pass = document.getElementById('loginPass').value;
+        document.getElementById('loginError').innerText = '';
+        if (!user || !pass) { document.getElementById('loginError').innerText = 'Please fill all fields'; return; }
+        try {
+            const res = await fetch(`${API}/auth/login`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+            if (res.ok) {
+                const data = await res.json();
+                loginSuccess(data.token, data.display, data.role);
+                return;
+            }
+            const err = await res.json();
+            document.getElementById('loginError').innerText = err.detail || 'Invalid username or password';
+        } catch(e) {
+            document.getElementById('loginError').innerText = 'Cannot reach server. Try again.';
+        }
+    }
+
+    async function doSignup() {
+        const user    = document.getElementById('signupUser').value.trim();
+        const email   = document.getElementById('signupEmail').value.trim();
+        const pass    = document.getElementById('signupPass').value;
+        const confirm = document.getElementById('signupConfirm').value;
+        document.getElementById('signupError').innerText = '';
+        if (!user || !pass) { document.getElementById('signupError').innerText = 'Fill all fields'; return; }
+        if (!email || !email.includes('@')) { document.getElementById('signupError').innerText = 'Enter a valid email'; return; }
+        if (pass !== confirm) { document.getElementById('signupError').innerText = 'Passwords do not match'; return; }
+        if (pass.length < 4) { document.getElementById('signupError').innerText = 'Password must be at least 4 characters'; return; }
+        try {
+            const res = await fetch(`${API}/auth/signup`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({username: user, password: pass, display: user, email: email})
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                document.getElementById('signupError').innerText = data.detail || 'Signup failed';
+                return;
+            }
+            loginSuccess(data.token, data.display, data.role);
+        } catch(e) {
+            document.getElementById('signupError').innerText = 'Cannot reach server. Try again.';
+        }
+    }
+
+    function loginSuccess(token, display, role) {
+        localStorage.setItem('up_token', token);
+        localStorage.setItem('up_display', display);
+        localStorage.setItem('up_role', role);
+        currentUser = { token, display, role };
+        document.getElementById('authOverlay').classList.add('hidden');
+        updateNavUser();
+        renderTrackingPanel();
+        connectCitizenSSE(token);  // connect live stream
+    }
+
+    // SSE for citizens — shows a toast when their complaint status changes
+    function connectCitizenSSE(token) {
+        if (citizenSSE) citizenSSE.close();
+        citizenSSE = new EventSource(API + '/stream');
+        citizenSSE.addEventListener('status_update', function(e) {
+            const d = JSON.parse(e.data);
+            // Check if this ref_id belongs to the current user
+            const myInc = JSON.parse(localStorage.getItem('myIncidents') || '[]');
+            const mine  = myInc.find(i => i.ref_id === d.ref_id);
+            if (mine) {
+                showCitizenToast('Your complaint ' + d.ref_id + ' is now: ' + d.status);
+                // Auto-refresh the tracking status display
+                const statusEl = document.getElementById('status-' + d.ref_id);
+                if (statusEl) statusEl.innerText = d.status;
+            }
+        });
+        citizenSSE.addEventListener('new_comment', function(e) {
+            const d = JSON.parse(e.data);
+            const myInc = JSON.parse(localStorage.getItem('myIncidents') || '[]');
+            if (myInc.find(i => i.ref_id === d.ref_id)) {
+                showCitizenToast('New reply on ' + d.ref_id + ': "' + d.message.substring(0,40) + '"');
+            }
+        });
+        citizenSSE.onerror = function() { setTimeout(function(){ connectCitizenSSE(token); }, 5000); };
+    }
+
+    function showCitizenToast(msg) {
+        const t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;background:#0a1e12;'
+            + 'border:1px solid #00ff9d;color:#00ff9d;font-family:monospace;font-size:0.75rem;'
+            + 'padding:0.7rem 1.1rem;max-width:300px;box-shadow:0 4px 20px #0008;border-radius:2px;';
+        t.innerText = '▸ ' + msg;
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.4s'; }, 4000);
+        setTimeout(() => t.remove(), 4500);
+    }
+
+    function skipAuth() {
+        document.getElementById('authOverlay').classList.add('hidden');
+        updateNavUser();
+    }
+
+    function doLogout() {
+        if (citizenSSE) citizenSSE.close();
+        localStorage.removeItem('up_token');
+        localStorage.removeItem('up_display');
+        localStorage.removeItem('up_role');
+        currentUser = null;
+        location.reload();
+    }
+
+    function updateNavUser() {
+        const token   = localStorage.getItem('up_token');
+        const display = localStorage.getItem('up_display');
+        const role    = localStorage.getItem('up_role');
+        const navRight = document.getElementById('navRight');
+        if (token && display) {
+            navRight.innerHTML = `
+                <div class="nav-user">
+                    <span style="color:var(--secondary-accent);">${display}</span>
+                    <span class="nav-role">${role}</span>
+                    <button class="nav-logout" onclick="doLogout()">LOGOUT</button>
+                </div>`;
+        }
+    }
+
+    // On load — check if already logged in
+    window.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('up_token');
+        if (token) {
+            document.getElementById('authOverlay').classList.add('hidden');
+            updateNavUser();
+        }
+        // Auto-refresh tracked incident statuses every 30s
+        setInterval(function() {
+            const myIncidents = JSON.parse(localStorage.getItem('myIncidents') || '[]');
+            myIncidents.forEach(function(i) {
+                if (document.getElementById('status-' + i.ref_id)) {
+                    window.checkStatus(i.ref_id);
+                }
+            });
+        }, 30000);
+    });
+    </script>
+
+    <script src="js/report.js" type="module"></script>
 </body>
 </html>

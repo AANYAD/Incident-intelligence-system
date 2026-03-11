@@ -1,9 +1,68 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 from transformers import pipeline
 from datetime import datetime, timedelta
-import uuid
+import uuid, json, os, asyncio, hashlib
+import smtplib, threading
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# ── EMAIL CONFIG ──────────────────────────────────────────────────────
+# Fill in your Gmail credentials below OR set as environment variables.
+# Use a Gmail App Password (not your real password):
+# https://myaccount.google.com/apppasswords
+from dotenv import load_dotenv
+load_dotenv()
+
+SMTP_EMAIL    = os.environ.get("URBANPULSE_EMAIL", "")
+SMTP_PASSWORD = os.environ.get("URBANPULSE_PASSWORD", "")
+SMTP_ENABLED  = bool(SMTP_EMAIL and SMTP_PASSWORD)
+
+def send_email_async(to_email: str, subject: str, body: str):
+    """Send email in a background thread — never blocks the API."""
+    if not SMTP_ENABLED or not to_email:
+        return
+    def _send():
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"]    = "UrbanPulse <{}>".format(SMTP_EMAIL)
+            msg["To"]      = to_email
+            msg.attach(MIMEText(body, "html"))
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as s:
+                s.login(SMTP_EMAIL, SMTP_PASSWORD)
+                s.sendmail(SMTP_EMAIL, to_email, msg.as_string())
+        except Exception as e:
+            print("[EMAIL] Failed to send to {}: {}".format(to_email, e))
+    threading.Thread(target=_send, daemon=True).start()
+
+def make_email_html(title: str, lines: list) -> str:
+    rows = "".join(
+        "<tr><td style='padding:6px 12px;color:#ccc;font-size:13px;font-family:monospace;'>{}</td></tr>".format(l)
+        for l in lines
+    )
+    return """
+    <div style="background:#0a0a0a;padding:32px;font-family:monospace;max-width:520px;">
+      <h2 style="color:#ff4d00;font-size:18px;margin-bottom:4px;">UrbanPulse_</h2>
+      <p style="color:#555;font-size:11px;margin-bottom:20px;border-bottom:1px solid #1a1a1a;padding-bottom:12px;">
+        CIVIC INCIDENT INTELLIGENCE SYSTEM
+      </p>
+      <h3 style="color:#e0e0e0;font-size:15px;margin-bottom:8px;">{title}</h3>
+      <table style="width:100%;border-collapse:collapse;background:#111;border:1px solid #1a1a1a;">{rows}</table>
+      <p style="color:#333;font-size:11px;margin-top:20px;border-top:1px solid #1a1a1a;padding-top:12px;">
+        You are receiving this because you registered at UrbanPulse with this email.
+      </p>
+    </div>""".format(title=title, rows=rows)
+
+def get_citizen_email(token: str) -> str:
+    """Look up email for a citizen from their session token."""
+    sess = sessions.get(token)
+    if not sess:
+        return ""
+    return citizen_users.get(sess.get("username", ""), {}).get("email", "")
 
 app = FastAPI()
 
@@ -15,192 +74,591 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-incidents = []
-
+# ── AI MODEL ──────────────────────────────────────────────────────────
 classifier = pipeline(
     "text-classification",
     model="distilbert-base-uncased-finetuned-sst-2-english"
 )
 
-class Incident(BaseModel):
-    text: str
-    latitude: float
-    longitude: float
+# ── PERSISTENCE ───────────────────────────────────────────────────────
+DATA_FILE  = "data.json"
+USERS_FILE = "users.json"
 
-# ========================
-# KEYWORD LISTS
-# ========================
-low_keywords = [
-    'small', 'minor', 'slight', 'little', 'tiny', 'minimal',
-    'crack', 'flickering', 'fading', 'chipped', 'broken bench',
-    'pothole near', 'one street', 'paint', 'garbage bin',
-    'stray dog', 'overgrown', 'dirty wall', 'graffiti',
-    'speed bump', 'faded marking', 'loose wire', 'dripping'
-]
+def load_data():
+    """Load incidents from disk on startup."""
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
 
-high_keywords = [
-    'fire', 'explosion', 'collapsed', 'collapse', 'gas leak',
-    'unconscious', 'electrocuted', 'flood', 'trapped', 'dead',
-    'injury', 'injured', 'bleeding', 'accident', 'critical',
-    'bridge broken', 'wall collapsed', 'building collapsed',
-    'short circuit', 'transformer blast', 'main pipe burst',
-    'sinkhole', 'road caved', 'electric shock',
-    'sewage overflow', 'contaminated water', 'epidemic',
-    'poisoning', 'chemical', 'smoke', 'toxic', 'fumes',
-    'blast', 'cylinder', 'gas cylinder', 'bomb'
-]
+def save_data():
+    """Save all incidents to disk after every write."""
+    with open(DATA_FILE, "w") as f:
+        json.dump(incidents, f, indent=2, default=str)
 
-medium_keywords = [
-    'pothole', 'waterlogging', 'no water', 'power cut',
-    'outage', 'traffic jam', 'blocked drain', 'broken road',
-    'streetlight not working', 'garbage not collected',
-    'construction', 'encroachment', 'illegal parking',
-    'water leakage', 'pipe leaking', 'signal not working'
-]
+def load_users():
+    """Load citizen accounts from disk."""
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
 
-# ========================
-# DEPARTMENT ROUTING
-# ========================
+def save_users():
+    """Save citizen accounts to disk."""
+    with open(USERS_FILE, "w") as f:
+        json.dump(citizen_users, f, indent=2)
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# ── IN-MEMORY STORES (loaded from disk) ───────────────────────────────
+incidents     = load_data()
+citizen_users = load_users()   # { username: { password_hash, display, created_at } }
+sessions      = {}             # sessions are NOT persisted (expire on restart, fine)
+
+# SSE subscribers: list of asyncio.Queue, one per connected client
+sse_subscribers: list[asyncio.Queue] = []
+
+VALID_STATUSES = {"OPEN", "UNDER REVIEW", "IN PROGRESS", "RESOLVED"}
+
+# Hardcoded authority users (staff accounts — not stored in users.json)
+AUTHORITY_USERS = {
+    "superadmin": {"password": "super123",  "role": "super_admin",   "display": "Super Admin"},
+    "fire_dept":  {"password": "fire123",   "role": "dept_admin",    "display": "Fire & Rescue Dept"},
+    "water_dept": {"password": "water123",  "role": "dept_admin",    "display": "Water Department"},
+    "officer1":   {"password": "field123",  "role": "field_officer", "display": "Field Officer 1"},
+    "admin":      {"password": "admin",     "role": "super_admin",   "display": "Admin"},
+}
+
+# ── SSE HELPERS ───────────────────────────────────────────────────────
+async def broadcast(event: str, data: dict):
+    """Push an SSE event to all connected clients."""
+    msg = f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+    dead = []
+    for q in sse_subscribers:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            dead.append(q)
+    for q in dead:
+        sse_subscribers.remove(q)
+
+# ── MODELS ────────────────────────────────────────────────────────────
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    display:  Optional[str] = None
+    email:    Optional[str] = None
+
+class IncidentRequest(BaseModel):
+    description: str
+    category:    str
+    latitude:    float
+    longitude:   float
+    image:       Optional[str] = None
+    token:       Optional[str] = None   # citizen token to link email
+
+class UpdateStatusRequest(BaseModel):
+    id:            str
+    status:        str
+    token:         str
+    internal_note: Optional[str] = None
+
+class CommentRequest(BaseModel):
+    incident_id: str
+    token:       str
+    message:     str
+
+# ── KEYWORDS ─────────────────────────────────────────────────────────
+HIGH_KEYWORDS   = ["fire","explosion","gas leak","unconscious","electrocuted","flood",
+                   "collapse","blast","cylinder","toxic","shooting","accident","emergency"]
+MEDIUM_KEYWORDS = ["pothole","waterlogging","power cut","traffic jam","blocked drain",
+                   "garbage not collected","outage","overflow","broken pipe","no water"]
+LOW_KEYWORDS    = ["small","minor","slight","crack","flickering","dripping","one street",
+                   "small pothole","dim light","slow drain"]
+
+DEPT_MAP = {
+    "fire":       ("Fire & Rescue",   4),
+    "blast":      ("Fire & Rescue",   4),
+    "gas leak":   ("Fire & Rescue",   4),
+    "flood":      ("Fire & Rescue",   4),
+    "water":      ("Water Dept",     24),
+    "drain":      ("Water Dept",     24),
+    "sewer":      ("Water Dept",     24),
+    "pipe":       ("Water Dept",     24),
+    "power":      ("Power & Energy", 12),
+    "outage":     ("Power & Energy", 12),
+    "electric":   ("Power & Energy", 12),
+    "road":       ("Public Works",   48),
+    "pothole":    ("Public Works",   48),
+    "traffic":    ("Public Works",   48),
+    "garbage":    ("Sanitation Dept",48),
+    "waste":      ("Sanitation Dept",48),
+    "sanitation": ("Sanitation Dept",48),
+}
+
+def get_severity(text: str) -> str:
+    t = text.lower()
+    for kw in HIGH_KEYWORDS:
+        if kw in t: return "HIGH"
+    for kw in MEDIUM_KEYWORDS:
+        if kw in t: return "MEDIUM"
+    for kw in LOW_KEYWORDS:
+        if kw in t: return "LOW"
+    try:
+        result = classifier(text[:512])[0]
+        score  = result["score"]
+        if score > 0.90: return "HIGH"
+        if score > 0.75: return "MEDIUM"
+        return "LOW"
+    except:
+        return "MEDIUM"
+
 def get_department(text: str):
     t = text.lower()
-    if any(k in t for k in ['fire', 'smoke', 'gas leak', 'explosion', 'blast', 'cylinder', 'gas cylinder', 'burning']):
-        return 'Fire & Rescue'
-    if any(k in t for k in ['water', 'sewer', 'sanitation', 'leak', 'pipe', 'drainage', 'flood']):
-        return 'Water Dept'
-    if any(k in t for k in ['power', 'electric', 'outage', 'transformer', 'electrocuted', 'light', 'current']):
-        return 'Power & Energy'
-    if any(k in t for k in ['road', 'pothole', 'traffic', 'bridge', 'construction', 'signal', 'footpath']):
-        return 'Public Works'
-    if any(k in t for k in ['garbage', 'waste', 'drain', 'stink', 'smell']):
-        return 'Sanitation Dept'
-    return 'General Services'
+    for kw, (dept, sla) in DEPT_MAP.items():
+        if kw in t:
+            return dept, sla
+    return "General Services", 48
 
-# ========================
-# SLA HOURS PER TYPE
-# ========================
-def get_sla_hours(text: str, severity: str):
-    t = text.lower()
-    if any(k in t for k in ['fire', 'gas', 'explosion', 'blast', 'flood', 'collapsed']):
-        hours = 4
-    elif any(k in t for k in ['power', 'electric', 'outage', 'transformer']):
-        hours = 12
-    elif any(k in t for k in ['water', 'sewer', 'sanitation', 'leak']):
-        hours = 24
-    elif any(k in t for k in ['road', 'pothole', 'traffic', 'bridge']):
-        hours = 48
-    else:
-        hours = 48
-    if severity == "HIGH":
-        hours = max(4, hours // 2)
-    return hours
+def get_session_user(token: str):
+    return sessions.get(token)
 
-# ========================
-# SEVERITY CLASSIFIER
-# ========================
-def classify_severity(text: str):
-    text_lower = text.lower()
-    for kw in low_keywords:
-        if kw in text_lower:
-            return "LOW", 0.5
-    for kw in high_keywords:
-        if kw in text_lower:
-            return "HIGH", 0.99
-    for kw in medium_keywords:
-        if kw in text_lower:
-            return "MEDIUM", 0.75
-    result = classifier(text)[0]
-    score = result["score"]
-    if score > 0.90:
-        severity = "HIGH"
-    elif score > 0.75:
-        severity = "MEDIUM"
-    else:
-        severity = "LOW"
-    return severity, score
+def require_auth(token: str, roles: list = None):
+    user = get_session_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if roles and user["role"] not in roles:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return user
 
+# ── AUTH: CITIZEN SIGNUP ──────────────────────────────────────────────
+@app.post("/auth/signup")
+def signup(req: SignupRequest):
+    username = req.username.strip().lower()
+    if not username or len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if not req.password or len(req.password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    if username in citizen_users:
+        raise HTTPException(status_code=409, detail="Username already taken")
+    if username in AUTHORITY_USERS:
+        raise HTTPException(status_code=409, detail="Username already taken")
 
+    display = req.display or req.username
+    citizen_users[username] = {
+        "password_hash": hash_password(req.password),
+        "display":       display,
+        "role":          "citizen",
+        "email":         req.email or "",
+        "created_at":    datetime.now().isoformat(),
+    }
+    save_users()  # persist to disk
+
+    # Welcome email
+    if req.email:
+        send_email_async(req.email, "Welcome to UrbanPulse", make_email_html(
+            "Account Created",
+            ["Username: " + username,
+             "You can now submit and track civic complaints.",
+             "You will receive email alerts when your complaint status changes."]
+        ))
+
+    token = str(uuid.uuid4())
+    sessions[token] = {
+        "username": username,
+        "role":     "citizen",
+        "display":  display,
+        "token":    token,
+    }
+    return {"token": token, "role": "citizen", "display": display}
+
+# ── AUTH: LOGIN (authority + citizen) ────────────────────────────────
+@app.post("/auth/login")
+def login(req: LoginRequest):
+    username = req.username.strip().lower()
+
+    # Check authority accounts first
+    auth_user = AUTHORITY_USERS.get(username) or AUTHORITY_USERS.get(req.username)
+    if auth_user and auth_user["password"] == req.password:
+        token = str(uuid.uuid4())
+        sessions[token] = {
+            "username": username,
+            "role":     auth_user["role"],
+            "display":  auth_user["display"],
+            "token":    token,
+        }
+        return {"token": token, "role": auth_user["role"], "display": auth_user["display"]}
+
+    # Check citizen accounts
+    cit_user = citizen_users.get(username)
+    if cit_user and cit_user["password_hash"] == hash_password(req.password):
+        token = str(uuid.uuid4())
+        sessions[token] = {
+            "username": username,
+            "role":     "citizen",
+            "display":  cit_user["display"],
+            "token":    token,
+        }
+        return {"token": token, "role": "citizen", "display": cit_user["display"]}
+
+    raise HTTPException(status_code=401, detail="Invalid username or password")
+
+@app.post("/auth/logout")
+def logout(data: dict):
+    sessions.pop(data.get("token", ""), None)
+    return {"ok": True}
+
+@app.get("/auth/me")
+def me(token: str):
+    user = get_session_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+# ── SSE: REAL-TIME STREAM ─────────────────────────────────────────────
+@app.get("/stream")
+async def stream():
+    """
+    Server-Sent Events endpoint.
+    Frontend connects once and receives live pushes on every change.
+    """
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+    sse_subscribers.append(queue)
+
+    async def event_generator():
+        # Send a welcome ping so client knows connection is alive
+        yield "event: connected\ndata: {\"msg\": \"stream ready\"}\n\n"
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=25.0)
+                    yield msg
+                except asyncio.TimeoutError:
+                    # Send keepalive comment every 25s to prevent proxy timeout
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if queue in sse_subscribers:
+                sse_subscribers.remove(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":               "no-cache",
+            "X-Accel-Buffering":           "no",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+# ── CITIZEN: SUBMIT ───────────────────────────────────────────────────
 @app.post("/classify")
-def classify_incident(data: Incident):
-    severity, confidence = classify_severity(data.text)
-    department = get_department(data.text)
-    sla_hours = get_sla_hours(data.text, severity)
-    created_at = datetime.now()
-    sla_due = created_at + timedelta(hours=sla_hours)
-    ref_id = "INC-" + str(uuid.uuid4())[:8].upper()
+async def classify(req: IncidentRequest):
+    severity           = get_severity(req.description)
+    department, sla_h  = get_department(req.description)
+    if severity == "HIGH":
+        sla_h = max(4, sla_h // 2)
 
-    incident = {
-        "id": str(uuid.uuid4()),
-        "ref_id": ref_id,
-        "description": data.text,
-        "latitude": data.latitude,
-        "longitude": data.longitude,
-        "severity": severity,
-        "confidence": round(confidence, 2),
-        "category": "AI-Predicted",
-        "status": "OPEN",
-        "department": department,
-        "sla_hours": sla_hours,
-        "created_at": created_at.isoformat(),
-        "sla_due": sla_due.isoformat(),
-        "image": None
+    now     = datetime.now()
+    sla_due = now + timedelta(hours=sla_h)
+    ref_id  = "INC-" + str(uuid.uuid4())[:8].upper()
+    inc_id  = str(uuid.uuid4())
+
+    # Look up submitter email if token provided
+    submitter_email = ""
+    if req.token:
+        submitter_email = get_citizen_email(req.token)
+
+    incidents[inc_id] = {
+        "id":              inc_id,
+        "ref_id":          ref_id,
+        "description":     req.description,
+        "category":        req.category,
+        "latitude":        req.latitude,
+        "longitude":       req.longitude,
+        "severity":        severity,
+        "status":          "OPEN",
+        "department":      department,
+        "sla_due":         sla_due.isoformat(),
+        "sla_hours":       sla_h,
+        "created_at":      now.isoformat(),
+        "resolved_at":     None,
+        "image":           req.image,
+        "comments":        [],
+        "history":         [{"status": "OPEN", "time": now.isoformat(), "by": "system"}],
+        "submitter_email": submitter_email,
     }
-    incidents.append(incident)
-    return {
-        "severity": severity,
-        "confidence": round(confidence, 2),
-        "category": "AI-Predicted",
+
+    # Confirm submission to citizen
+    if submitter_email:
+        send_email_async(submitter_email, "Complaint Submitted — " + ref_id,
+            make_email_html("Complaint Received", [
+                "Reference ID: <b style='color:#ff4d00;'>" + ref_id + "</b>",
+                "Category: " + req.category,
+                "Severity: " + severity,
+                "Routed to: " + department,
+                "SLA: " + str(sla_h) + " hours",
+                "Save your Reference ID to track your complaint.",
+            ])
+        )
+    save_data()  # persist
+
+    # Broadcast new incident to all SSE clients
+    await broadcast("new_incident", {
+        "id":         inc_id,
+        "ref_id":     ref_id,
+        "category":   req.category,
+        "severity":   severity,
         "department": department,
-        "sla_hours": sla_hours,
-        "ref_id": ref_id
-    }
+        "status":     "OPEN",
+    })
 
+    return {"id": inc_id, "ref_id": ref_id, "severity": severity,
+            "department": department, "sla_hours": sla_h, "status": "OPEN"}
 
-@app.get("/incidents")
-def get_incidents():
-    return incidents
-
-
-# Citizen can track their incident by ref_id
+# ── CITIZEN: TRACK ────────────────────────────────────────────────────
 @app.get("/track/{ref_id}")
-def track_incident(ref_id: str):
-    for i in incidents:
-        if i.get("ref_id") == ref_id.upper():
+def track(ref_id: str):
+    for inc in incidents.values():
+        if inc["ref_id"] == ref_id:
             return {
-                "ref_id": i["ref_id"],
-                "description": i["description"],
-                "status": i["status"],
-                "severity": i["severity"],
-                "department": i["department"],
-                "created_at": i["created_at"],
-                "resolved_at": i.get("resolved_at")
+                "id":          inc["id"],
+                "ref_id":      inc["ref_id"],
+                "status":      inc["status"],
+                "severity":    inc["severity"],
+                "department":  inc["department"],
+                "created_at":  inc["created_at"],
+                "resolved_at": inc["resolved_at"],
+                "history":     inc.get("history", []),
+                "comments":    [c for c in inc.get("comments", []) if not c.get("internal")],
             }
     raise HTTPException(status_code=404, detail="Incident not found")
 
+# ── PUBLIC: HEATMAP + STATS ───────────────────────────────────────────
+@app.get("/public/heatmap")
+def public_heatmap():
+    return [
+        {"latitude": i["latitude"], "longitude": i["longitude"],
+         "severity": i["severity"], "category": i["category"],
+         "status": i["status"], "created_at": i["created_at"],
+         "description": i.get("description","")}
+        for i in incidents.values()
+    ]
 
-@app.post("/incidents")
-def create_incident(data: dict):
-    if "id" not in data or not data["id"]:
-        data["id"] = str(uuid.uuid4())
-    if "created_at" not in data:
-        data["created_at"] = datetime.now().isoformat()
-    incidents.append(data)
-    return data
+@app.get("/public/stats")
+def public_stats():
+    all_inc = list(incidents.values())
+    cats = {}
+    for i in all_inc:
+        c = i.get("category", "Other")
+        cats[c] = cats.get(c, 0) + 1
+    return {
+        "total":        len(all_inc),
+        "open":         sum(1 for i in all_inc if i["status"] == "OPEN"),
+        "under_review": sum(1 for i in all_inc if i["status"] == "UNDER REVIEW"),
+        "in_progress":  sum(1 for i in all_inc if i["status"] == "IN PROGRESS"),
+        "resolved":     sum(1 for i in all_inc if i["status"] == "RESOLVED"),
+        "by_category":  cats,
+    }
 
+# ── ADMIN: LIST + FILTER ──────────────────────────────────────────────
+@app.get("/incidents")
+def get_incidents(
+    status:     Optional[str] = None,
+    severity:   Optional[str] = None,
+    department: Optional[str] = None,
+    category:   Optional[str] = None,
+    search:     Optional[str] = None,
+    date_from:  Optional[str] = None,
+    date_to:    Optional[str] = None,
+    area:       Optional[str] = None,
+):
+    result = list(incidents.values())
+    if status:    result = [i for i in result if i["status"] == status.upper()]
+    if severity:  result = [i for i in result if i["severity"] == severity.upper()]
+    if department:result = [i for i in result if i.get("department","").lower() == department.lower()]
+    if category:  result = [i for i in result if category.lower() in i.get("category","").lower()]
+    if search:
+        q = search.lower()
+        result = [i for i in result if q in i.get("description","").lower()
+                  or q in i.get("ref_id","").lower()]
+    if area:
+        a = area.lower()
+        result = [i for i in result if a in i.get("description","").lower()]
+    if date_from:
+        try:
+            df = datetime.fromisoformat(date_from)
+            result = [i for i in result if i.get("created_at")
+                      and datetime.fromisoformat(i["created_at"]) >= df]
+        except: pass
+    if date_to:
+        try:
+            dt = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            result = [i for i in result if i.get("created_at")
+                      and datetime.fromisoformat(i["created_at"]) <= dt]
+        except: pass
+    result.sort(key=lambda x: x.get("created_at",""), reverse=True)
+    return result
 
-# Update incident — supports image upload too
+# ── ADMIN: UPDATE STATUS ──────────────────────────────────────────────
 @app.post("/update")
-def update_incident(updated: dict):
-    incident_id = updated.get("id")
-    new_status = updated.get("status")
-    if not incident_id:
-        raise HTTPException(status_code=400, detail="Missing id")
-    for i in incidents:
-        if i["id"] == incident_id:
-            i["status"] = new_status
-            if new_status == "RESOLVED":
-                i["resolved_at"] = datetime.now().isoformat()
-            # Store image if provided
-            if "image" in updated:
-                i["image"] = updated["image"]
-            return {"message": "updated", "id": incident_id, "status": new_status}
-    raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found")
+async def update_status(req: UpdateStatusRequest):
+    user = require_auth(req.token, roles=["super_admin","dept_admin","field_officer"])
+    inc  = incidents.get(req.id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    new_status = req.status.upper()
+    if new_status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status")
+
+    inc["status"] = new_status
+    now = datetime.now().isoformat()
+    inc.setdefault("history", []).append({"status": new_status, "time": now, "by": user["display"]})
+
+    if new_status == "RESOLVED":
+        inc["resolved_at"] = now
+        inc["resolved_by"] = user["display"]
+    else:
+        inc["resolved_at"] = None
+        inc.pop("resolved_by", None)
+
+    if req.internal_note:
+        inc["comments"].append({
+            "id": str(uuid.uuid4())[:8], "author": user["display"],
+            "role": user["role"], "message": req.internal_note,
+            "internal": True, "time": now,
+        })
+
+    save_data()  # persist
+
+    # Email the citizen whose complaint was updated
+    # Find the incident submitter by checking if any citizen token matches
+    for uname, udata in citizen_users.items():
+        # We don't store who submitted which incident, so notify all who tracked this ref_id
+        # Best effort: if incident has a submitter_token field use it
+        pass
+    submitter_email = inc.get("submitter_email", "")
+    if submitter_email:
+        status_colors = {"OPEN":"#ff4d00","UNDER REVIEW":"#ffcc00","IN PROGRESS":"#00aaff","RESOLVED":"#00ff9d"}
+        send_email_async(submitter_email, "Update on your complaint " + inc["ref_id"],
+            make_email_html("Complaint Status Updated", [
+                "Reference ID: " + inc["ref_id"],
+                "New Status: <span style='color:{};font-weight:bold;'>{}</span>".format(
+                    status_colors.get(new_status, "#aaa"), new_status),
+                "Updated by: " + user["display"],
+                "Category: " + inc.get("category",""),
+                "Description: " + inc.get("description","")[:80],
+            ])
+        )
+
+    # Broadcast status change to all SSE clients
+    await broadcast("status_update", {
+        "id":         inc["id"],
+        "ref_id":     inc["ref_id"],
+        "status":     new_status,
+        "updated_by": user["display"],
+        "time":       now,
+    })
+
+    return inc
+
+# ── COMMENT ───────────────────────────────────────────────────────────
+@app.post("/comment")
+async def add_comment(req: CommentRequest):
+    inc = incidents.get(req.incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    user   = get_session_user(req.token)
+    author = user["display"] if user else "Citizen"
+    role   = user["role"]    if user else "citizen"
+
+    comment = {
+        "id": str(uuid.uuid4())[:8], "author": author, "role": role,
+        "message": req.message, "internal": False,
+        "time": datetime.now().isoformat(),
+    }
+    inc["comments"].append(comment)
+    save_data()  # persist
+
+    # Email citizen if an authority replied publicly
+    if role != "citizen":
+        submitter_email = inc.get("submitter_email", "")
+        if submitter_email:
+            send_email_async(submitter_email, "Authority replied on " + inc["ref_id"],
+                make_email_html("New Reply on Your Complaint", [
+                    "Reference ID: " + inc["ref_id"],
+                    "Reply from: " + author,
+                    "Message: " + req.message,
+                    "Current Status: " + inc.get("status",""),
+                ])
+            )
+
+    # Broadcast new comment to all SSE clients
+    await broadcast("new_comment", {
+        "incident_id": req.incident_id,
+        "ref_id":      inc["ref_id"],
+        "author":      author,
+        "message":     req.message,
+    })
+
+    return comment
+
+# ── ANALYTICS ────────────────────────────────────────────────────────
+@app.get("/analytics")
+def analytics(token: str):
+    require_auth(token, roles=["super_admin","dept_admin"])
+    all_inc = list(incidents.values())
+
+    by_severity = {"HIGH":0,"MEDIUM":0,"LOW":0}
+    by_status   = {"OPEN":0,"UNDER REVIEW":0,"IN PROGRESS":0,"RESOLVED":0}
+    by_dept     = {}
+    by_category = {}
+    resolution_times = []
+
+    for i in all_inc:
+        by_severity[i.get("severity","LOW")] = by_severity.get(i.get("severity","LOW"),0) + 1
+        st = i.get("status","OPEN")
+        by_status[st] = by_status.get(st, 0) + 1
+        dept = i.get("department","Unknown")
+        by_dept[dept] = by_dept.get(dept, 0) + 1
+        cat  = i.get("category","Unknown")
+        by_category[cat] = by_category.get(cat, 0) + 1
+        if i.get("resolved_at") and i.get("created_at"):
+            try:
+                t1 = datetime.fromisoformat(i["created_at"])
+                t2 = datetime.fromisoformat(i["resolved_at"])
+                resolution_times.append((t2-t1).total_seconds()/3600)
+            except: pass
+
+    resolved_count = by_status.get("RESOLVED", 0)
+    avg_res = round(sum(resolution_times)/len(resolution_times),1) if resolution_times else 0
+    sla_breaches = sum(
+        1 for i in all_inc
+        if i["status"] != "RESOLVED" and i.get("sla_due")
+        and datetime.now() > datetime.fromisoformat(i["sla_due"])
+    )
+
+    return {
+        "total":              len(all_inc),
+        "by_severity":        by_severity,
+        "by_status":          by_status,
+        "by_department":      by_dept,
+        "by_category":        by_category,
+        "avg_resolution_hrs": avg_res,
+        "sla_breaches":       sla_breaches,
+        "resolution_rate":    round(resolved_count/len(all_inc)*100,1) if all_inc else 0,
+    }
