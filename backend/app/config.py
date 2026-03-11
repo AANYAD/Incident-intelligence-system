@@ -1,1 +1,1 @@
-APP_NAME = "UrbanPulse AI"
+APP_NAME = "UrbanPulse AI"    
